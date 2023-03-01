@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>植吧海战大逃杀</title>
     <link
       rel="stylesheet"
@@ -9,23 +10,29 @@
       integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk"
       crossorigin="anonymous"
     />
-
-    <style>
-      #gameScreen {
-        display: none;
-      }
-    </style>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <section class="vh-100">
       <div class="container h-100">
+        <div id="loadingScreen" class="h-100">
+          <div
+            class="d-flex flex-column align-items-center justify-content-center h-100"
+          >
+            <div class="loader"></div>
+          </div>
+        </div>
+
         <div id="initialScreen" class="h-100">
           <div
             class="d-flex flex-column align-items-center justify-content-center h-100"
           >
             <h1>欢迎来到植吧海战大逃杀</h1>
             <div>当前游戏版本：alpha 1.0, 2022/2/27</div>
-            <button type="submit" class="btn btn-primary" id="newGameButton">
+            <div class="form-group">
+              <input type="text" placeholder="输入昵称" id="nicknameInput" />
+            </div>
+            <button type="button" class="btn btn-primary" id="newGameButton">
               创建新游戏
             </button>
             <div>或</div>
@@ -38,13 +45,147 @@
           </div>
         </div>
 
-        <div id=""
+        <div id="waitingScreen" class="h-100">
+          <div
+            class="d-flex flex-column align-items-center justify-content-center h-100"
+          >
+            <h1>少女等待中...</h1>
+            <div>房间号：<span id="gameCodeDisplay"></span></div>
+            <div>
+              目前人数：<span id="currentPlayerNumDisplay"></span>（最多为<span
+                id="maxPlayerNumDisplay"
+              ></span
+              >）
+            </div>
+            <div>已加入玩家：</div>
+            <div id="currentPlayerListWrap">
+              <ul id="currentPlayerList"></ul>
+            </div>
+            <div style="margin: 10px">
+              <button
+                type="button"
+                class="btn btn-primary"
+                id="startGameButton"
+              >
+                开始游戏
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="overlay" id="chooseShipOverlay">
+          <div class="d-flex align-items-center justify-content-center h-100">
+            <div class="bg-dark dialogBox">
+              <div class="d-flex flex-column overflow-hidden h-100">
+                <div>
+                  <h1 class="text-center text-white">请选择你的船只</h1>
+                </div>
+                <div class="d-flex flex-row w-100 mh-100">
+                  <div class="container overflow-auto shipPanelLeft">
+                    <div class="row">
+                      <div class="col-md-4">
+                        <img
+                          src="asset/images/草船.jpg"
+                          alt="草船"
+                          class="shipImg"
+                          onClick="showShipInfo(0)"
+                        />
+                        <img
+                          src="asset/images/水雷舰.jpg"
+                          alt="水雷舰"
+                          class="shipImg"
+                          onClick="showShipInfo(3)"
+                        />
+                        <img
+                          src="asset/images/幽灵船.jpg"
+                          alt="幽灵船"
+                          class="shipImg"
+                          onClick="showShipInfo(6)"
+                        />
+                        <img
+                          src="asset/images/冰航母.jpg"
+                          alt="冰航母"
+                          class="shipImg"
+                          onClick="showShipInfo(9)"
+                        />
+                      </div>
+                      <div class="col-md-4">
+                        <img
+                          src="asset/images/潜水艇.jpg"
+                          alt="潜水艇"
+                          class="shipImg"
+                          onClick="showShipInfo(1)"
+                        />
+
+                        <img
+                          src="asset/images/菊花箭船.jpg"
+                          alt="菊花箭船"
+                          class="shipImg"
+                          onClick="showShipInfo(4)"
+                        />
+                        <img
+                          src="asset/images/炮船.jpg"
+                          alt="炮船"
+                          class="shipImg"
+                          onClick="showShipInfo(7)"
+                        />
+                      </div>
+                      <div class="col-md-4">
+                        <img
+                          src="asset/images/回收舰.jpg"
+                          alt="回收舰"
+                          class="shipImg"
+                          onClick="showShipInfo(2)"
+                        />
+                        <img
+                          src="asset/images/破冰船.jpg"
+                          alt="破冰船"
+                          class="shipImg"
+                          onClick="showShipInfo(5)"
+                        />
+
+                        <img
+                          src="asset/images/轻型航母.jpg"
+                          alt="轻型航母"
+                          class="shipImg"
+                          onClick="showShipInfo(8)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    class="shipPanelRight d-flex flex-column justify-content-start"
+                  >
+                    <div class="shipInfo">
+                      <h2 id="shipName"></h2>
+                      <p>
+                        <span id="shipSize"></span><br />
+                        <span id="shipAttack"></span><br />
+                        <span id="shipSpeed"></span>
+                      </p>
+                      <div id="shipSkills"></div>
+                    </div>
+                    <div class="align-self-end shipConfirm">
+                      <button
+                        type="button"
+                        class="btn btn-primary"
+                        id="chooseShipButton"
+                      >
+                        确定
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div id="gameScreen" class="h-100">
           <div
             class="d-flex flex-column align-items-center justify-content-center h-100"
           >
-            <h1>Your game code is: <span id="gameCodeDisplay"></span></h1>
+            <h1>Your game code is: <span id="gameCodeInGameDisplay"></span></h1>
 
             <canvas id="canvas"></canvas>
           </div>
@@ -53,6 +194,6 @@
     </section>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
-    <script src="script.js"></script>
+    <script src="client.js"></script>
   </body>
 </html>
