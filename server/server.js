@@ -11,23 +11,24 @@ const io = require("socket.io")(httpServer, {
   },
   allowEIO3: true,
 });
-const { initGame } = require("./game");
+const { initGameState } = require("./game");
 const { MIN_PLAYER_NUM, MAX_PLAYER_NUM, SHIP_SETTING } = require("./constants");
 const SHIP_COUNT = SHIP_SETTING.length;
 const { makeid } = require("./utils");
 
-const state = {};
-const clientToRoom = new Map();
-const roomToClient = new Map();
+const gameState = {};
+const clientToRoom = {};
+const roomToClient = {}; // value: [{id, nickname}, ...]
 
 io.on("connection", (client) => {
   client.on("newWaitingRoom", handleNewWaitingRoom);
   client.on("joinWaitingRoom", handleJoinWaitingRoom);
+  client.on("enterGame", handleEnterGame); // game not active yet
   client.on("getShipInfo", handleGetShipInfo);
 
   function handleNewWaitingRoom(nickname) {
-    if (clientToRoom.has(client.id)) {
-      client.emit("alreadyInWaitingRoom");
+    if (clientToRoom[client.id]) {
+      client.emit("error", "啊咧？你已经在等待室里了……", false);
       return;
     }
     let gameCode = makeid(4);
@@ -48,10 +49,10 @@ io.on("connection", (client) => {
     const room = io.sockets.adapter.rooms.get(gameCode);
     let numClients = room ? room.size : 0;
     if (numClients === 0) {
-      client.emit("unknownCode");
+      client.emit("error", "找不到该房间号……", true);
       return;
     } else if (numClients >= MAX_PLAYER_NUM) {
-      client.emit("tooManyPlayers");
+      client.emit("error", "来晚了！该房间人数已满", true);
       return;
     }
 
@@ -69,10 +70,35 @@ io.on("connection", (client) => {
 
   function handleGetShipInfo(shipNum) {
     if (shipNum < 0 || shipNum >= SHIP_COUNT) {
-      client.emit("shipInfo", null, null);
+      client.emit("error", "啊咧？找不到该船只信息……", false);
       return;
     }
     client.emit("shipInfo", shipNum, SHIP_SETTING[shipNum]);
+  }
+
+  function handleEnterGame() {
+    // console.log(clientToRoom, client.id);
+    // console.log(clientToRoom.has(client.id));
+    if (!clientToRoom[client.id]) {
+      client.emit("error", "啊咧？你不在任何房间里，所以不能开始游戏……", true);
+      return;
+    }
+    let room = clientToRoom[client.id];
+    if (!roomToClient[room]) {
+      client.emit("error", "啊咧？当前房间不存在，所以不能开始游戏……", true);
+      return;
+    }
+    let clients = roomToClient[room];
+    if (clients.length < MIN_PLAYER_NUM) {
+      client.emit("error", "啊咧？人数还不够哦", false);
+      return;
+    }
+    if (clients.length > MAX_PLAYER_NUM) {
+      client.emit("error", "啊咧？当前房间人数已超过上限", true);
+      return;
+    }
+    gameState[room] = initGameState(clients);
+    io.to(room).emit("chooseShip");
   }
 
   client.on("disconnecting", () => {
@@ -94,11 +120,11 @@ io.on("connection", (client) => {
             isRoomMaster: true,
           });
         } else {
-          roomToClient.delete(r);
+          delete roomToClient[r];
         }
       }
     }
-    clientToRoom.delete(client.id);
+    delete clientToRoom[client.id];
   });
 });
 

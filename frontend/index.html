@@ -65,7 +65,7 @@
               <button
                 type="button"
                 class="btn btn-primary"
-                id="startGameButton"
+                id="enterGameButton"
               >
                 开始游戏
               </button>
@@ -76,86 +76,96 @@
         <div class="overlay" id="chooseShipOverlay">
           <div class="d-flex align-items-center justify-content-center h-100">
             <div class="bg-dark dialogBox">
-              <div class="d-flex flex-column overflow-hidden h-100">
+              <div class="d-flex flex-column h-100">
                 <div>
                   <h1 class="text-center text-white">请选择你的船只</h1>
                 </div>
-                <div class="d-flex flex-row w-100 mh-100">
-                  <div class="container overflow-auto shipPanelLeft">
-                    <div class="row">
-                      <div class="col-md-4">
-                        <img
-                          src="asset/images/草船.jpg"
-                          alt="草船"
-                          class="shipImg"
-                          onClick="showShipInfo(0)"
-                        />
-                        <img
-                          src="asset/images/水雷舰.jpg"
-                          alt="水雷舰"
-                          class="shipImg"
-                          onClick="showShipInfo(3)"
-                        />
-                        <img
-                          src="asset/images/幽灵船.jpg"
-                          alt="幽灵船"
-                          class="shipImg"
-                          onClick="showShipInfo(6)"
-                        />
-                        <img
-                          src="asset/images/冰航母.jpg"
-                          alt="冰航母"
-                          class="shipImg"
-                          onClick="showShipInfo(9)"
-                        />
-                      </div>
-                      <div class="col-md-4">
-                        <img
-                          src="asset/images/潜水艇.jpg"
-                          alt="潜水艇"
-                          class="shipImg"
-                          onClick="showShipInfo(1)"
-                        />
-
-                        <img
-                          src="asset/images/菊花箭船.jpg"
-                          alt="菊花箭船"
-                          class="shipImg"
-                          onClick="showShipInfo(4)"
-                        />
-                        <img
-                          src="asset/images/炮船.jpg"
-                          alt="炮船"
-                          class="shipImg"
-                          onClick="showShipInfo(7)"
-                        />
-                      </div>
-                      <div class="col-md-4">
-                        <img
-                          src="asset/images/回收舰.jpg"
-                          alt="回收舰"
-                          class="shipImg"
-                          onClick="showShipInfo(2)"
-                        />
-                        <img
-                          src="asset/images/破冰船.jpg"
-                          alt="破冰船"
-                          class="shipImg"
-                          onClick="showShipInfo(5)"
-                        />
-
-                        <img
-                          src="asset/images/轻型航母.jpg"
-                          alt="轻型航母"
-                          class="shipImg"
-                          onClick="showShipInfo(8)"
-                        />
-                      </div>
+                <div class="d-flex flex-row w-100">
+                  <div class="shipPanelLeft">
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/草船.jpg"
+                        alt="草船"
+                        onClick="showShipInfo(0)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/潜水艇.jpg"
+                        alt="潜水艇"
+                        onClick="showShipInfo(1)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/回收舰.jpg"
+                        alt="回收舰"
+                        onClick="showShipInfo(2)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/水雷舰.jpg"
+                        alt="水雷舰"
+                        onClick="showShipInfo(3)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/菊花箭船.jpg"
+                        alt="菊花箭船"
+                        onClick="showShipInfo(4)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/破冰船.jpg"
+                        alt="破冰船"
+                        onClick="showShipInfo(5)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/幽灵船.jpg"
+                        alt="幽灵船"
+                        onClick="showShipInfo(6)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/炮船.jpg"
+                        alt="炮船"
+                        onClick="showShipInfo(7)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/轻型航母.jpg"
+                        alt="轻型航母"
+                        onClick="showShipInfo(8)"
+                      />
+                    </div>
+                    <div class="shipImg">
+                      <img
+                        src="asset/images/冰航母.jpg"
+                        alt="冰航母"
+                        onClick="showShipInfo(9)"
+                      />
                     </div>
                   </div>
                   <div
-                    class="shipPanelRight d-flex flex-column justify-content-start"
+                    class="shipPanelRight d-flex flex-column-reverse justify-content-between"
                   >
+                    <div class="align-self-end shipConfirm">
+                      <button
+                        type="button"
+                        class="btn btn-primary"
+                        id="decideShipButton"
+                        disabled
+                      >
+                        确定
+                      </button>
+                    </div>
                     <div class="shipInfo">
                       <h2 id="shipName"></h2>
                       <p>
@@ -164,15 +174,9 @@
                         <span id="shipSpeed"></span>
                       </p>
                       <div id="shipSkills"></div>
-                    </div>
-                    <div class="align-self-end shipConfirm">
-                      <button
-                        type="button"
-                        class="btn btn-primary"
-                        id="chooseShipButton"
-                      >
-                        确定
-                      </button>
+                      <div id="shipPassive"></div>
+                      <small><p id="shipNote" class="shipTextMuted"></p></small>
+                      <p id="shipQuote" class="shipTextMuted text-right"></p>
                     </div>
                   </div>
                 </div>
@@ -185,8 +189,6 @@
           <div
             class="d-flex flex-column align-items-center justify-content-center h-100"
           >
-            <h1>Your game code is: <span id="gameCodeInGameDisplay"></span></h1>
-
             <canvas id="canvas"></canvas>
           </div>
         </div>

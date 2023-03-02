@@ -10,7 +10,7 @@
   display: none;
 }
 
-#startGameButton {
+#enterGameButton {
   display: none;
 }
 
@@ -19,8 +19,14 @@
   src: url("asset/fonts/RuiJian.woff") format("woff");
 }
 
-body {
-  font-family: "RuiJian", sans-serif;
+@font-face {
+  font-family: "XiHei";
+  src: url("asset/fonts/XiHei.woff") format("woff");
+}
+
+body,
+input {
+  font-family: "RuiJian", "XiHei", sans-serif;
 }
 
 .overlay {
@@ -36,58 +42,58 @@ body {
 
 .dialogBox {
   height: 90%;
-  width: 90%;
+  width: calc(100vw - 10vh);
   padding: 15px;
 }
 
 .shipPanelLeft {
   width: 67%;
+  height: calc(90vh - 15px - 56px - 30px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
 }
 
 .shipPanelRight {
   width: 33%;
+  height: calc(90vh - 15px - 56px - 15px);
   padding: 15px;
+  padding-top: 0px;
   color: white;
 }
 
 .shipInfo {
-  height: 80%;
-  overflow: auto;
+  padding-top: 15px;
+  overflow-y: auto;
 }
 
 .shipConfirm {
-  height: 20%;
   padding-top: 15px;
 }
 
 .shipImg {
-  max-width: 100%;
-  margin-top: 15px;
-  margin-bottom: 15px;
-  position: relative;
-  transition: box-shadow 0.15s ease-in-out;
+  flex-basis: 33.33%;
+  min-width: 0;
+  padding: 15px;
 }
 
-.shipImg:hover {
+.shipImg img {
+  transition: box-shadow 0.15s ease-in-out;
+  width: 100%;
+}
+
+.shipImg img:hover {
   cursor: pointer;
   box-shadow: 0 0 5px 5px #0ff;
 }
 
-.btn:hover {
-  box-shadow: 0 0 3px 3px #0ff;
+.shipTextMuted {
+  color: #94a0ab;
 }
 
-@media screen and (max-width: 768px) {
-  .dialogBox {
-    width: 100%;
-    height: 100%;
-  }
-  .shipPanelLeft {
-    width: 50%;
-  }
-  .shipPanelRight {
-    width: 50%;
-  }
+.btn:not(:disabled):not(.disabled):hover {
+  box-shadow: 0 0 3px 3px #0ff;
 }
 
 .loader {
@@ -116,5 +122,23 @@ body {
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .dialogBox {
+    width: 100%;
+    height: 100%;
+  }
+  .shipPanelLeft {
+    width: 50%;
+    height: calc(100vh - 15px - 56px - 30px);
+  }
+  .shipPanelRight {
+    width: 50%;
+    height: calc(100vh - 15px - 56px - 15px);
+  }
+  .shipImg {
+    flex-basis: 100%;
   }
 }
