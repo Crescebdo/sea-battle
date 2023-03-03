@@ -19,7 +19,7 @@ const { makeRoomID, shuffleArray } = require("./utils");
 // stage - "waiting", "chooseShip", "chosenShip", "inGame"
 
 const pidLookup = {}; // lookup from client id to player id
-const players = {}; // pid -> {pid, cid, nickname, roomID, stage, ship }
+const players = {}; // pid -> {pid, cid, nickname, roomID, stage, ship, ghosted }
 const rooms = {}; // roomID -> array of playerIDs (based on enter order)
 
 io.on("connection", (client) => {
@@ -59,7 +59,7 @@ io.on("connection", (client) => {
       nicknameList: rooms[roomID].map((pid) => players[pid].nickname),
       minPlayerNum: MIN_PLAYER_NUM,
       maxPlayerNum: MAX_PLAYER_NUM,
-      isRoomMaster: rooms[roomID][0] === pid,
+      isRoomMaster: true,
     });
   }
 
@@ -121,6 +121,10 @@ io.on("connection", (client) => {
     if (!player) {
       return;
     }
+    if (rooms[player.roomID][0] != player.pid) {
+      client.emit("error", "啊咧？只有房主能开始游戏", false);
+      return;
+    }
     if (rooms[player.roomID].length < MIN_PLAYER_NUM) {
       client.emit("error", "啊咧？人数还不够哦", false);
       return;
@@ -149,6 +153,7 @@ io.on("connection", (client) => {
       return;
     }
     player.ship = { shipNum, width, height, row, col };
+    player.stage = "chosenShip";
 
     updateReadyPlayerCount(player);
   }
@@ -187,7 +192,16 @@ io.on("connection", (client) => {
       delete players[player.pid];
     } else {
       player.ghosted = true;
-      if (player.stage === "chosenShip") {
+      delete pidLookup[cid];
+      if (!rooms[player.roomID] || rooms[player.roomID].filter(pid => !players[pid].ghosted).length === 0) {
+        // All ghosted, delete rooom
+        for (const pid of rooms[player.roomID]) {
+          delete pidLookup[pid];
+          delete players[pid];
+        }
+        delete rooms[player.roomID];
+      }
+      else if (player.stage === "chosenShip") {
         updateReadyPlayerCount(player);
       }
     }
@@ -211,8 +225,15 @@ io.on("connection", (client) => {
       client.emit("error", "啊咧？玩家不存在", true);
       return;
     }
-    client.emit("restore", )
-    console.log(+"重连");
+    player.ghosted = false;
+    player.cid = cid;
+    pidLookup[cid] = player.pid;
+    client.emit("restore", {
+      ...player,
+      totalPlayerCount: rooms[roomID].length,
+    });
+    updateReadyPlayerCount(player);
+    console.log(player.nickname + " 重连成功");
   }
 
   function validateConncetionInRoom() {
@@ -234,22 +255,21 @@ io.on("connection", (client) => {
       (pid) => !players[pid].ghosted && players[pid].ship
     ).length;
     const totalPlayerCount = rooms[player.roomID].length;
-    // if (readyPlayerCount === totalPlayerCount) {
-    //   // if everyone has chosen ship and no one disconnected, start!
-    //   for (const pid of rooms[player.roomID]) {
-    //     players[pid].stage = "inGame";
-    //   }
-    //   io.to(player.roomID).emit("startGame", "good!");
-    // } else {
-    player.stage = "chosenShip";
-    for (const pid of rooms[player.roomID].filter(
-      (pid) => players[pid].stage === "chosenShip"
-    )) {
-      io.to(players[pid].cid).emit(
-        "chosenShip",
-        readyPlayerCount,
-        totalPlayerCount
-      );
+    if (readyPlayerCount >= totalPlayerCount) {
+      for (const pid of rooms[player.roomID]) {
+        players[pid].stage = "inGame";
+      }
+      io.to(player.roomID).emit("startGame", 1, "晴天");
+    } else {
+      for (const pid of rooms[player.roomID].filter(
+        (pid) => players[pid].stage === "chosenShip"
+      )) {
+        io.to(players[pid].cid).emit(
+          "chosenShip",
+          readyPlayerCount,
+          totalPlayerCount
+        );
+      }
     }
   }
 });

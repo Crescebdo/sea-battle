@@ -1,3 +1,4 @@
+/*global io */
 const DEBUG = true;
 // const API_SERVER = "https://api.crescb.com";
 const API_SERVER = "http://localhost:3000";
@@ -9,18 +10,23 @@ const socket = io(API_SERVER, {
 });
 socket.on("error", handleError);
 socket.on("chooseGhost", handleChooseGhost);
+socket.on("restore", handleRestore);
 socket.on("enterWaitingRoom", handleEnterWaitingRoom);
 socket.on("chooseShip", handleChooseShip);
 socket.on("shipInfo", handleShipInfo);
 socket.on("chosenShip", handleChosenShip); // still need to wait
 socket.on("startGame", handleStartGame);
 
-const numToChinese = ["", "单", "双", "三", "四", "五", "六", "七", "八"];
-let canvas, ctx;
-let gameActive = false;
+const playerCountChinese = ["", "单", "双", "三", "四", "五", "六", "七", "八"];
+let timerStart;
+let timerIntervalID;
 let shipInfoCache = {};
-let myShip = {}; // shipNum, width, height, name, row, col, noGo
-let gameBoardInfo = { displayMode: "unknown", shipPos: [] };
+let myShip = {}; // shipNum, width, height, name, row, col
+let gameBoardInfo = {
+  displayMode: "unknown",
+  noGo: { rows: new Set(), cols: new Set() },
+  shipPos: [],
+};
 
 // VH resize
 const mainContents = document.getElementById("main");
@@ -52,25 +58,31 @@ const currentPlayerListWrap = document.getElementById("currentPlayerListWrap");
 const enterGameButton = document.getElementById("enterGameButton");
 enterGameButton.addEventListener("click", enterGame);
 
-// screen with status bar
+// status bar
 const screenWithStatusBar = document.getElementById("screenWithStatusBar");
+const statusBar = document.getElementById("statusBar");
+const statusTurnNumLine = document.getElementById("statusTurnNumLine");
+const statusTurnNum = document.getElementById("statusTurnNum");
+const statusWeather = document.getElementById("statusWeather");
+const statusRoomLine = document.getElementById("statusRoomLine");
 const statusTotalPlayerCount = document.getElementById(
   "statusTotalPlayerCount"
 );
 const statusRoomID = document.getElementById("statusRoomID");
+const statusTimerLine = document.getElementById("statusTimerLine");
+const statusTimer = document.getElementById("statusTimer");
 const subScreenDVH = document.getElementsByClassName("subScreenDVH");
 
 // choose ship screen
 const chooseShipScreen = document.getElementById("chooseShipScreen");
-const shipPanel = document.getElementById("shipPanel");
 const shipPanelLeft = document.getElementById("shipPanelLeft");
 const shipPanelRight = document.getElementById("shipPanelRight");
-const chooseShipHeader = document.getElementById("chooseShipHeader");
 const shipName = document.getElementById("shipName");
 const shipSize = document.getElementById("shipSize");
 const shipAttack = document.getElementById("shipAttack");
 const shipSpeed = document.getElementById("shipSpeed");
 const shipSkills = document.getElementById("shipSkills");
+const shipPassive = document.getElementById("shipPassive");
 const shipNote = document.getElementById("shipNote");
 const shipQuote = document.getElementById("shipQuote");
 const decideShipTypeButton = document.getElementById("decideShipTypeButton");
@@ -78,7 +90,6 @@ decideShipTypeButton.addEventListener("click", decideShipType);
 
 // choose ship position screen
 const choosePosScreen = document.getElementById("choosePosScreen");
-const choosePosHeader = document.getElementById("choosePosHeader");
 const choosePosFooter = document.getElementById("choosePosFooter");
 const choosePosShipName = document.getElementById("choosePosShipName");
 const choosePosShipSize = document.getElementById("choosePosShipSize");
@@ -91,17 +102,12 @@ decidePosButton.addEventListener("click", decideShipPosition);
 
 // already chosen ship
 const chosenShipScreen = document.getElementById("chosenShipScreen");
-const chosenShipWaitHeader = document.getElementById("chosenShipWaitHeader");
-const chosenShipWaitInfo = document.getElementById("chosenShipWaitInfo");
-const chosenShipWaitFooter = document.getElementById("chosenShipWaitFooter");
 const currentChosen = document.getElementById("currentChosen");
 const maxChosen = document.getElementById("maxChosen");
 
 // game screen
 const gameScreen = document.getElementById("gameScreen");
 const gameBoard = document.getElementById("gameBoard");
-const verticalLabels = document.getElementsByClassName("verticalLabel");
-const horizontalLabels = document.getElementsByClassName("horizontalLabel");
 const gameGrids = new Array(9);
 for (let r = 1; r <= 8; r++) {
   gameGrids[r] = new Array(9);
@@ -115,6 +121,17 @@ for (let r = 1; r <= 8; r++) {
     gameGrids[r][c].addEventListener("click", () => clickGameGrid(r, c));
   }
 }
+
+const allScreens = [
+  loadingScreen,
+  initialScreen,
+  waitingScreen,
+  ghostScreen,
+  chosenShipScreen,
+  choosePosScreen,
+  chooseShipScreen,
+  gameScreen,
+];
 
 // handlers
 
@@ -139,6 +156,19 @@ function handleChooseGhost({ roomID, nicknameList }) {
       socket.emit("chosenGhost", { roomID, nickname })
     );
     ghostList.appendChild(newItem);
+  }
+}
+
+function handleRestore({ stage, totalPlayerCount, roomID, ship }) {
+  if (stage === "chooseShip") {
+    displayChooseShipScreen();
+    updateStatusBar({ totalPlayerCount, roomID });
+  } else if (stage === "chosenShip") {
+    displayChosenShipScreen();
+    updateStatusBar({ totalPlayerCount, roomID });
+    socket.emit("decideShip", ship);
+  } else if (stage === "inGame") {
+    displayGameScreen();
   }
 }
 
@@ -177,8 +207,6 @@ function handleEnterWaitingRoom({
   // update "start game" based on if is room master
   if (isRoomMaster) {
     enterGameButton.style.display = "inline-block";
-  } else if (isRoomMaster === false) {
-    enterGameButton.style.display = "none";
   }
 
   // update nickname list
@@ -186,7 +214,7 @@ function handleEnterWaitingRoom({
     let newList = document.createElement("ul");
     newList.classList.add("list-group");
     let isFirstPlayer = true;
-    for (nickname of nicknameList) {
+    for (const nickname of nicknameList) {
       let newItem = document.createElement("li");
       newItem.classList.add(
         "list-group-item",
@@ -205,12 +233,7 @@ function handleEnterWaitingRoom({
 
 function handleChooseShip({ totalPlayerCount, roomID }) {
   displayChooseShipScreen();
-
-  // update status bar
-  if (numToChinese[totalPlayerCount]) {
-    statusTotalPlayerCount.innerHTML = numToChinese[totalPlayerCount];
-  }
-  statusRoomID.innerHTML = roomID;
+  updateStatusBar({ totalPlayerCount, roomID });
 }
 
 function handleShipInfo(shipNum, shipInfo) {
@@ -227,8 +250,10 @@ function handleChosenShip(readyPlayerCount, totalPlayerCount) {
   maxChosen.innerHTML = totalPlayerCount;
 }
 
-function handleStartGame(debug) {
-  console.log(debug);
+function handleStartGame(turnNum, weather) {
+  displayGameScreen();
+  updateStatusBar({ turnNum, weather });
+  startTimer();
 }
 
 // button functions
@@ -264,16 +289,18 @@ function enterGame() {
   socket.emit("enterGame");
 }
 
-function showShipInfo(shipNum) {
+/* eslint-disable */
+const showShipInfo = (shipNum) => {
   if (shipInfoCache[shipNum]) {
     displayShipInfo(shipNum, shipInfoCache[shipNum]);
   } else {
     socket.emit("getShipInfo", shipNum);
   }
-}
+};
+/* eslint-enable */
 
 function decideShipType() {
-  if (!"shipNum" in myShip) {
+  if (isNaN(myShip.shipNum)) {
     alert("啊咧？尚未选择船只哦");
     return;
   }
@@ -284,26 +311,22 @@ function decideShipType() {
   myShip.width = shipInfoCache[myShip.shipNum].width;
   myShip.height = shipInfoCache[myShip.shipNum].height;
   myShip.name = shipInfoCache[myShip.shipNum].name;
-  myShip.noGo = { rows: new Set(), cols: new Set() };
-  displayChoosePosScreen();
 
   choosePosShipName.innerHTML = myShip.name;
   choosePosShipSize.innerHTML = `${myShip.width}×${myShip.height}`;
-
-  gameBoardInfo.displayMode = "move";
-  initGameBoard(myShip);
+  displayChoosePosScreen();
 }
 
 function clickGameGrid(row, col) {
   if (gameBoardInfo.displayMode === "move") {
-    moveShip({ row, col, noGo: myShip.noGo });
+    moveShip({ row, col });
     decidePosButton.disabled = false;
   }
 }
 
 function toggleShipDirection() {
   [myShip.width, myShip.height] = [myShip.height, myShip.width];
-  initGameBoard(myShip);
+  drawGameBoard({ ...myShip, gameBoardInfo });
   moveShip(myShip);
   choosePosShipSize.innerHTML = `${myShip.width}×${myShip.height}`;
 }
@@ -359,7 +382,7 @@ function displayShipInfo(
     shipSpeed.innerHTML = "航速：" + speed + "格";
   }
   shipSkills.innerHTML = "";
-  for (s of skills) {
+  for (const s of skills) {
     const shipSkillName = document.createElement("h3");
     shipSkillName.innerHTML = "特性-" + s.skillName;
     shipSkills.appendChild(shipSkillName);
@@ -386,24 +409,30 @@ function displayShipInfo(
   decideShipTypeButton.disabled = false;
 }
 
-function initGameBoard({ width, height, noGo }) {
+function drawGameBoard({ width, height, noGo, displayMode }) {
   if (!width || !height || width < 0 || height < 0) {
     alert("啊咧？船只尺寸不合法");
     return;
   }
   for (let r = 1; r <= 8; r++)
     for (let c = 1; c <= 8; c++) {
-      gameGrids[r][c].disabled = isGridDisabled(
-        r,
-        c,
-        myShip.width,
-        myShip.height,
-        noGo
-      );
+      if (noGo.rows.has(r)) {
+        gameGrids[r][c].disabled = true;
+        gameGrids[r][c].classList.add("noGo");
+      } else {
+        gameGrids[r][c].classList.remove("noGo");
+        if (displayMode === "move") {
+          gameGrids[r][c].disabled = isGridDisabled(r, c, width, height, noGo);
+          gameGrids[r][c].classList.remove("normalColor");
+        } else if (displayMode === "none") {
+          gameGrids[r][c].disabled = true;
+          gameGrids[r][c].classList.add("normalColor");
+        }
+      }
     }
 }
 
-function moveShip({ row, col, noGo }) {
+function moveShip({ row, col }) {
   for (const [r, c] of gameBoardInfo.shipPos) {
     gameGrids[r][c].innerText = "";
   }
@@ -415,7 +444,7 @@ function moveShip({ row, col, noGo }) {
     }
   toggleShipDirectionButton.disabled =
     myShip.width === myShip.height ||
-    isGridDisabled(row, col, myShip.height, myShip.width, noGo);
+    isGridDisabled(row, col, myShip.height, myShip.width, gameBoardInfo.noGo);
   myShip.row = row;
   myShip.col = col;
 }
@@ -453,53 +482,94 @@ window.onload = function () {
   displayInitialScreen();
 };
 
-// Display screens
+// display functions
+
+function closeAllExcept(activeScreen, hasStatusBar) {
+  for (const screen of allScreens.filter((s) => s.id != activeScreen.id)) {
+    screen.style.display = "none";
+  }
+  activeScreen.style.display = "block";
+  screenWithStatusBar.style.display = hasStatusBar ? "block" : "none";
+  if (!hasStatusBar) hideTimer();
+}
+
+function updateStatusBar({ turnNum, weather, totalPlayerCount, roomID }) {
+  let doRefreshVH = false;
+  if (turnNum && weather) {
+    statusTurnNumLine.style.visibility = "visible";
+    statusTurnNum.innerHTML = turnNum;
+    statusWeather.innerHTML = weather;
+    doRefreshVH = true;
+  }
+  if (totalPlayerCount && roomID) {
+    statusRoomLine.style.visibility = "visible";
+    if (playerCountChinese[totalPlayerCount]) {
+      statusTotalPlayerCount.innerHTML = playerCountChinese[totalPlayerCount];
+    }
+    statusRoomID.innerHTML = roomID;
+    doRefreshVH = true;
+  }
+  if (doRefreshVH) refreshVH();
+}
+
+function startTimer() {
+  statusTimerLine.style.visibility = "visible";
+  statusTimer.innerHTML = "00:00";
+  timerStart = Date.now();
+  timerIntervalID = setInterval(function () {
+    let milsecSinceStart = Date.now() - timerStart;
+    let secSinceStart = Math.floor(milsecSinceStart / 1000);
+    const [seconds, minutes] = [
+      secSinceStart % 60,
+      Math.floor(secSinceStart / 60),
+    ];
+    statusTimer.innerHTML =
+      minutes.toString().padStart(2, "0") +
+      ":" +
+      seconds.toString().padStart(2, "0");
+  }, 1000);
+}
+
+function hideTimer() {
+  statusTimerLine.style.visibility = "hidden";
+  if (timerIntervalID) clearInterval(timerIntervalID);
+  timerStart = timerIntervalID = null;
+}
 
 function displayInitialScreen() {
-  loadingScreen.style.display = "none";
-  waitingScreen.style.display = "none";
-  ghostScreen.style.display = "none";
-  screenWithStatusBar.style.display = "none";
-
-  initialScreen.style.display = "block";
+  closeAllExcept(initialScreen, false);
 }
 
 function displayWaitingScreen() {
-  initialScreen.style.display = "none";
-  waitingScreen.style.display = "block";
+  closeAllExcept(waitingScreen, false);
 }
 
 function displayGhostScreen() {
-  initialScreen.style.display = "none";
-  ghostScreen.style.display = "block";
+  closeAllExcept(ghostScreen, false);
 }
 
 function displayChosenShipScreen() {
-  choosePosScreen.style.display = "none";
-  gameMyState.before(gameBoard);
-  gameBoard.style.marginTop = "15px";
-  for (const lb of [...verticalLabels, ...horizontalLabels]) {
-    lb.classList.remove("text-white");
-  }
-  screenWithStatusBar.style.display = "block";
-  chosenShipScreen.style.display = "block";
+  closeAllExcept(chosenShipScreen, true);
 }
 
 function displayChoosePosScreen() {
-  chooseShipScreen.style.display = "none";
-  screenWithStatusBar.style.display = "block";
-  choosePosScreen.style.display = "block";
+  closeAllExcept(choosePosScreen, true);
   choosePosFooter.before(gameBoard);
   gameBoard.style.marginTop = "-15px";
-  for (const lb of [...verticalLabels, ...horizontalLabels]) {
-    lb.className += " text-white";
-  }
+  gameBoardInfo.displayMode = "move";
+  drawGameBoard({ ...myShip, ...gameBoardInfo });
 }
 
 function displayChooseShipScreen() {
-  waitingScreen.style.display = "none";
-  screenWithStatusBar.style.display = "block";
-  chooseShipScreen.style.display = "block";
+  closeAllExcept(chooseShipScreen, true);
+}
+
+function displayGameScreen() {
+  closeAllExcept(gameScreen, true);
+  gameMyState.before(gameBoard);
+  gameBoard.style.marginTop = "15px";
+  gameBoardInfo.displayMode = "none";
+  drawGameBoard({ ...myShip, ...gameBoardInfo });
 }
 
 // VH Resize functions
@@ -525,9 +595,12 @@ function refreshVH() {
     return;
   }
   mainContents.style.height = window.innerHeight + "px";
-  shipPanelLeft.style.height = window.innerHeight - 15 - 24.2 - 15 - 56 + "px";
-  shipPanelRight.style.height = window.innerHeight - 15 - 24.2 - 15 - 56 + "px";
+  const headerHeight = statusBar.offsetHeight;
+  shipPanelLeft.style.height =
+    window.innerHeight - 15 - headerHeight - 15 - 56 + "px";
+  shipPanelRight.style.height =
+    window.innerHeight - 15 - headerHeight - 15 - 56 + "px";
   for (const subScreen of subScreenDVH) {
-    subScreen.style.height = window.innerHeight - 15 - 24.2 - 15 + "px";
+    subScreen.style.height = window.innerHeight - 15 - headerHeight - 15 + "px";
   }
 }

@@ -6,7 +6,8 @@
 #waitingScreen,
 #ghostScreen,
 #screenWithStatusBar,
-.screenUnderStatusBar {
+.screenUnderStatusBar,
+#enterGameButton {
   display: none;
 }
 
@@ -31,17 +32,6 @@ input {
   }
 }
 
-.overlay {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 100;
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
 #screenWithStatusBar {
   padding: 15px;
 }
@@ -51,11 +41,18 @@ input {
 }
 
 #statusBar {
-  margin-bottom: 5px;
+  padding-bottom: 5px;
 }
 
-#shipPanel {
-  display: flex;
+#statusTurnNumLine,
+#statusRoomLine,
+#statusTimerLine {
+  visibility: hidden;
+  flex: 1;
+}
+
+.hi {
+  color: yellow;
 }
 
 #shipPanelLeft {
@@ -167,7 +164,7 @@ input {
 }
 
 #gameRecord {
-  margin-top: 15px;
+  margin-top: 10px;
 }
 
 #gameRecord button {
@@ -193,6 +190,7 @@ input {
   display: flex;
   flex-direction: row;
   justify-content: center;
+  color: white;
 }
 
 .horizontalLabel {
@@ -202,6 +200,7 @@ input {
   flex-direction: row;
   justify-content: end;
   align-items: center;
+  color: white;
 }
 
 .gameGrid {
@@ -230,15 +229,24 @@ input {
   border-width: 2px;
 }
 
+.noGo.gameGridButton:disabled {
+  background-color: #909090;
+  border-color: #909090;
+}
+
+.normalColor.gameGridButton:disabled:not(.noGo) {
+  opacity: 1;
+}
+
 #gameMyState {
   flex-grow: 3;
   background-color: grey;
   margin-top: 15px;
+  max-height: 50vw;
 }
 
 #gameFooter {
   margin-top: 15px;
-  margin-bottom: 15px;
 }
 
 #gameFooter button {

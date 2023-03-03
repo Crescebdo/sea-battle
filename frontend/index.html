@@ -73,6 +73,9 @@
               开始游戏
             </button>
           </div>
+          <div class="text-center">
+            游戏中请勿刷新或离开页面<br />如果意外断线，输入同样的房间号可以重连
+          </div>
         </div>
       </div>
 
@@ -89,14 +92,21 @@
       <div id="screenWithStatusBar" class="w-100 h-100 bg-dark">
         <div id="statusBar">
           <div class="d-flex flex-row justify-content-between text-white">
-            <small></small>
-            <small
-              ><span id="statusTotalPlayerCount"></span>人竞技赛 (<span
-                id="statusRoomID"
-              ></span
-              >)</small
-            >
-            <small></small>
+            <div id="statusTurnNumLine" class="text-left">
+              <small>第</small><span id="statusTurnNum"></span><small>轮</small>
+              <span id="statusWeather"></span>
+            </div>
+            <div id="statusRoomLine" class="text-center">
+              <small
+                ><span id="statusTotalPlayerCount"></span>人竞技赛 (<span
+                  id="statusRoomID"
+                ></span
+                >)</small
+              >
+            </div>
+            <div id="statusTimerLine" class="text-right">
+              <small id="statusTimer"></small>
+            </div>
           </div>
         </div>
 
@@ -161,7 +171,7 @@
             <div id="chooseShipHeader">
               <h1 class="text-center text-white">请选择你的船只</h1>
             </div>
-            <div id="shipPanel" class="flex-row w-100">
+            <div class="d-flex flex-row w-100">
               <div id="shipPanelLeft">
                 <div class="shipImg">
                   <img
