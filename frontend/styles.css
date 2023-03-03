@@ -1,16 +1,12 @@
-#initScreen {
-  display: none;
+#main {
+  height: 100vh;
 }
 
-#gameScreen {
-  display: none;
-}
-
-#waitingScreen {
-  display: none;
-}
-
-#enterGameButton {
+#initialScreen,
+#waitingScreen,
+#ghostScreen,
+#screenWithStatusBar,
+.screenUnderStatusBar {
   display: none;
 }
 
@@ -19,14 +15,20 @@
   src: url("asset/fonts/RuiJian.woff") format("woff");
 }
 
-@font-face {
-  font-family: "XiHei";
-  src: url("asset/fonts/XiHei.woff") format("woff");
-}
-
 body,
 input {
-  font-family: "RuiJian", "XiHei", sans-serif;
+  font-family: "RuiJian", sans-serif;
+}
+
+@media screen and (min-width: 768px) {
+  @font-face {
+    font-family: "XiHei";
+    src: url("asset/fonts/XiHei.woff") format("woff");
+  }
+  body,
+  input {
+    font-family: "RuiJian", "XiHei", sans-serif;
+  }
 }
 
 .overlay {
@@ -40,13 +42,23 @@ input {
   background-color: rgba(0, 0, 0, 0.5);
 }
 
-.dialogBox {
-  height: 90%;
-  width: calc(100vw - 10vh);
+#screenWithStatusBar {
   padding: 15px;
 }
 
-.shipPanelLeft {
+.subScreenDVH {
+  height: calc(100vh - 15px - 24.2px - 15px);
+}
+
+#statusBar {
+  margin-bottom: 5px;
+}
+
+#shipPanel {
+  display: flex;
+}
+
+#shipPanelLeft {
   width: 67%;
   height: calc(90vh - 15px - 56px - 30px);
   overflow-y: auto;
@@ -55,16 +67,14 @@ input {
   flex-wrap: wrap;
 }
 
-.shipPanelRight {
+#shipPanelRight {
+  display: flex;
   width: 33%;
   height: calc(90vh - 15px - 56px - 15px);
-  padding: 15px;
-  padding-top: 0px;
   color: white;
 }
 
 .shipInfo {
-  padding-top: 15px;
   overflow-y: auto;
 }
 
@@ -75,7 +85,7 @@ input {
 .shipImg {
   flex-basis: 33.33%;
   min-width: 0;
-  padding: 15px;
+  padding: 7.5px 15px 7.5px 5px;
 }
 
 .shipImg img {
@@ -91,6 +101,14 @@ input {
 .shipTextMuted {
   color: #94a0ab;
 }
+
+#chooseShipPositionShipInfo {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-evenly;
+}
+
+/* global */
 
 .btn:not(:disabled):not(.disabled):hover {
   box-shadow: 0 0 3px 3px #0ff;
@@ -126,19 +144,103 @@ input {
 }
 
 @media screen and (max-width: 768px) {
-  .dialogBox {
-    width: 100%;
-    height: 100%;
-  }
-  .shipPanelLeft {
+  #shipPanelLeft {
     width: 50%;
     height: calc(100vh - 15px - 56px - 30px);
   }
-  .shipPanelRight {
+  #shipPanelRight {
     width: 50%;
     height: calc(100vh - 15px - 56px - 15px);
   }
   .shipImg {
     flex-basis: 100%;
   }
+  .btn {
+    font-weight: 500;
+  }
+}
+
+/* game screen */
+
+#gameHeader {
+  margin-top: 15px;
+}
+
+#gameRecord {
+  margin-top: 15px;
+}
+
+#gameRecord button {
+  font-size: 1.15rem;
+}
+
+#gameBoard {
+  width: calc(100vw - 10px);
+  height: 100vw;
+  margin-left: -15px;
+  margin-right: -15px;
+  margin-top: 15px;
+}
+
+.placeholderLabel {
+  width: 10px;
+  height: 20px;
+}
+
+.verticalLabel {
+  width: calc((100vw - 20px) / 8);
+  height: 20px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.horizontalLabel {
+  width: 10px;
+  height: calc(100vw / 17 * 2);
+  display: flex;
+  flex-direction: row;
+  justify-content: end;
+  align-items: center;
+}
+
+.gameGrid {
+  width: calc((100vw - 20px) / 8);
+  height: calc((100vw - 20px) / 8);
+  padding: 1px;
+}
+
+.gameGridButton {
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  background-color: #17a2b8;
+  border-color: #17a2b8;
+  box-shadow: none !important;
+  /* for showing ship icon */
+  padding: 0px;
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.gameGridButton:not(:disabled):not(.disabled):focus,
+.gameGridButton:not(:disabled):not(.disabled):active {
+  background-color: #17a2b8 !important;
+  border-color: aqua !important;
+  border-width: 2px;
+}
+
+#gameMyState {
+  flex-grow: 3;
+  background-color: grey;
+  margin-top: 15px;
+}
+
+#gameFooter {
+  margin-top: 15px;
+  margin-bottom: 15px;
+}
+
+#gameFooter button {
+  font-size: 1.25rem;
 }

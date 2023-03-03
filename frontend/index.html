@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>植吧海战大逃杀</title>
     <link
+      rel="icon"
+      type="image/x-icon"
+      href="/asset/images/icons/favicon.ico"
+    />
+    <link
       rel="stylesheet"
       href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css"
       integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk"
@@ -13,187 +18,492 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <section class="vh-100">
-      <div class="container h-100">
-        <div id="loadingScreen" class="h-100">
-          <div
-            class="d-flex flex-column align-items-center justify-content-center h-100"
-          >
-            <div class="loader"></div>
+    <main id="main">
+      <div id="loadingScreen" class="h-100">
+        <div
+          class="d-flex flex-column align-items-center justify-content-center h-100"
+        >
+          <div class="loader"></div>
+        </div>
+      </div>
+
+      <div id="initialScreen" class="h-100">
+        <div
+          class="d-flex flex-column align-items-center justify-content-center h-100"
+        >
+          <h1 class="text-center">
+            <span class="d-inline-block">欢迎来到</span
+            ><span class="d-inline-block">植吧海战大逃杀</span>
+          </h1>
+          <div>当前游戏版本：alpha 1.0, 2022/2/27</div>
+          <div class="form-group">
+            <input type="text" placeholder="输入昵称" id="nicknameInput" />
+          </div>
+          <button type="button" class="btn btn-primary" id="newGameButton">
+            创建新游戏
+          </button>
+          <div>或</div>
+          <div class="form-group">
+            <input type="text" placeholder="输入房间号" id="roomIDInput" />
+          </div>
+          <button type="submit" class="btn btn-primary" id="joinGameButton">
+            加入游戏
+          </button>
+        </div>
+      </div>
+
+      <div id="waitingScreen" class="h-100">
+        <div
+          class="d-flex flex-column align-items-center justify-content-center h-100"
+        >
+          <h1>少女等待中...</h1>
+          <div>房间号：<span id="roomIDDisplay"></span></div>
+          <div>
+            目前人数：<span id="currentPlayerNumDisplay"></span>（最多为<span
+              id="maxPlayerNumDisplay"
+            ></span
+            >）
+          </div>
+          <div>已加入玩家：</div>
+          <div id="currentPlayerListWrap">
+            <ul id="currentPlayerList"></ul>
+          </div>
+          <div style="margin: 10px">
+            <button type="button" class="btn btn-primary" id="enterGameButton">
+              开始游戏
+            </button>
           </div>
         </div>
+      </div>
 
-        <div id="initialScreen" class="h-100">
-          <div
-            class="d-flex flex-column align-items-center justify-content-center h-100"
-          >
-            <h1>欢迎来到植吧海战大逃杀</h1>
-            <div>当前游戏版本：alpha 1.0, 2022/2/27</div>
-            <div class="form-group">
-              <input type="text" placeholder="输入昵称" id="nicknameInput" />
-            </div>
-            <button type="button" class="btn btn-primary" id="newGameButton">
-              创建新游戏
-            </button>
-            <div>或</div>
-            <div class="form-group">
-              <input type="text" placeholder="输入房间号" id="gameCodeInput" />
-            </div>
-            <button type="submit" class="btn btn-primary" id="joinGameButton">
-              加入游戏
-            </button>
-          </div>
+      <div id="ghostScreen" class="h-100">
+        <div
+          class="d-flex flex-column align-items-center justify-content-center h-100"
+        >
+          <h1>断线重连</h1>
+          <div>从以下列表选择你的昵称：</div>
+          <div id="ghostList" class="list-group"></div>
         </div>
+      </div>
 
-        <div id="waitingScreen" class="h-100">
-          <div
-            class="d-flex flex-column align-items-center justify-content-center h-100"
-          >
-            <h1>少女等待中...</h1>
-            <div>房间号：<span id="gameCodeDisplay"></span></div>
-            <div>
-              目前人数：<span id="currentPlayerNumDisplay"></span>（最多为<span
-                id="maxPlayerNumDisplay"
+      <div id="screenWithStatusBar" class="w-100 h-100 bg-dark">
+        <div id="statusBar">
+          <div class="d-flex flex-row justify-content-between text-white">
+            <small></small>
+            <small
+              ><span id="statusTotalPlayerCount"></span>人竞技赛 (<span
+                id="statusRoomID"
               ></span
-              >）
+              >)</small
+            >
+            <small></small>
+          </div>
+        </div>
+
+        <div id="chosenShipScreen" class="screenUnderStatusBar">
+          <div class="d-flex flex-column justify-content-around subScreenDVH">
+            <div id="chosenShipWaitHeader" class="text-center text-white">
+              <h1>其他玩家选择中</h1>
             </div>
-            <div>已加入玩家：</div>
-            <div id="currentPlayerListWrap">
-              <ul id="currentPlayerList"></ul>
+            <div id="chosenShipWaitInfo" class="text-center text-white">
+              <span id="currentChosen"></span>/<span id="maxChosen"></span
+              >已选择
             </div>
-            <div style="margin: 10px">
+            <div id="chosenShipWaitFooter"></div>
+          </div>
+        </div>
+
+        <div id="choosePosScreen" class="screenUnderStatusBar">
+          <div class="d-flex flex-column justify-content-around subScreenDVH">
+            <div id="choosePosHeader" class="flex-column">
+              <h1 class="text-center text-white">请决定起始位置</h1>
+              <p class="text-center shipTextMuted">
+                <small>
+                  <span class="d-inline-block">方向（横向/竖向）确定后，</span
+                  ><span class="d-inline-block"
+                    >在游戏过程中将无法再更改</span
+                  ></small
+                >
+              </p>
+              <div
+                class="d-flex flex-row justify-content-around text-center text-white"
+              >
+                <p>所选船只：<span id="choosePosShipName"></span></p>
+                <p>体积：<span id="choosePosShipSize"></span></p>
+              </div>
+            </div>
+            <div
+              id="choosePosFooter"
+              class="d-flex flex-row justify-content-around"
+            >
               <button
                 type="button"
                 class="btn btn-primary"
-                id="enterGameButton"
+                id="toggleShipDirectionButton"
+                disabled
               >
-                开始游戏
+                更改方向
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                id="decidePosButton"
+                disabled
+              >
+                确定
               </button>
             </div>
           </div>
         </div>
 
-        <div class="overlay" id="chooseShipOverlay">
-          <div class="d-flex align-items-center justify-content-center h-100">
-            <div class="bg-dark dialogBox">
-              <div class="d-flex flex-column h-100">
-                <div>
-                  <h1 class="text-center text-white">请选择你的船只</h1>
+        <div id="chooseShipScreen" class="screenUnderStatusBar">
+          <div class="d-flex flex-column justify-content-around subScreenDVH">
+            <div id="chooseShipHeader">
+              <h1 class="text-center text-white">请选择你的船只</h1>
+            </div>
+            <div id="shipPanel" class="flex-row w-100">
+              <div id="shipPanelLeft">
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/草船.jpg"
+                    alt="草船"
+                    onClick="showShipInfo(0)"
+                  />
                 </div>
-                <div class="d-flex flex-row w-100">
-                  <div class="shipPanelLeft">
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/草船.jpg"
-                        alt="草船"
-                        onClick="showShipInfo(0)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/潜水艇.jpg"
-                        alt="潜水艇"
-                        onClick="showShipInfo(1)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/回收舰.jpg"
-                        alt="回收舰"
-                        onClick="showShipInfo(2)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/水雷舰.jpg"
-                        alt="水雷舰"
-                        onClick="showShipInfo(3)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/菊花箭船.jpg"
-                        alt="菊花箭船"
-                        onClick="showShipInfo(4)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/破冰船.jpg"
-                        alt="破冰船"
-                        onClick="showShipInfo(5)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/幽灵船.jpg"
-                        alt="幽灵船"
-                        onClick="showShipInfo(6)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/炮船.jpg"
-                        alt="炮船"
-                        onClick="showShipInfo(7)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/轻型航母.jpg"
-                        alt="轻型航母"
-                        onClick="showShipInfo(8)"
-                      />
-                    </div>
-                    <div class="shipImg">
-                      <img
-                        src="asset/images/冰航母.jpg"
-                        alt="冰航母"
-                        onClick="showShipInfo(9)"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    class="shipPanelRight d-flex flex-column-reverse justify-content-between"
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/潜水艇.jpg"
+                    alt="潜水艇"
+                    onClick="showShipInfo(1)"
+                  />
+                </div>
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/回收舰.jpg"
+                    alt="回收舰"
+                    onClick="showShipInfo(2)"
+                  />
+                </div>
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/水雷舰.jpg"
+                    alt="水雷舰"
+                    onClick="showShipInfo(3)"
+                  />
+                </div>
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/菊花箭船.jpg"
+                    alt="菊花箭船"
+                    onClick="showShipInfo(4)"
+                  />
+                </div>
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/破冰船.jpg"
+                    alt="破冰船"
+                    onClick="showShipInfo(5)"
+                  />
+                </div>
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/幽灵船.jpg"
+                    alt="幽灵船"
+                    onClick="showShipInfo(6)"
+                  />
+                </div>
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/炮船.jpg"
+                    alt="炮船"
+                    onClick="showShipInfo(7)"
+                  />
+                </div>
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/轻型航母.jpg"
+                    alt="轻型航母"
+                    onClick="showShipInfo(8)"
+                  />
+                </div>
+                <div class="shipImg">
+                  <img
+                    src="asset/images/ships/冰航母.jpg"
+                    alt="冰航母"
+                    onClick="showShipInfo(9)"
+                  />
+                </div>
+              </div>
+              <div
+                id="shipPanelRight"
+                class="flex-column-reverse justify-content-between"
+              >
+                <div class="align-self-end shipConfirm">
+                  <button
+                    type="button"
+                    class="btn btn-primary"
+                    id="decideShipTypeButton"
+                    disabled
                   >
-                    <div class="align-self-end shipConfirm">
-                      <button
-                        type="button"
-                        class="btn btn-primary"
-                        id="decideShipButton"
-                        disabled
-                      >
-                        确定
-                      </button>
-                    </div>
-                    <div class="shipInfo">
-                      <h2 id="shipName"></h2>
-                      <p>
-                        <span id="shipSize"></span><br />
-                        <span id="shipAttack"></span><br />
-                        <span id="shipSpeed"></span>
-                      </p>
-                      <div id="shipSkills"></div>
-                      <div id="shipPassive"></div>
-                      <small><p id="shipNote" class="shipTextMuted"></p></small>
-                      <p id="shipQuote" class="shipTextMuted text-right"></p>
-                    </div>
-                  </div>
+                    确定
+                  </button>
+                </div>
+                <div class="shipInfo">
+                  <h2 id="shipName"></h2>
+                  <p>
+                    <span id="shipSize"></span><br />
+                    <span id="shipAttack"></span><br />
+                    <span id="shipSpeed"></span>
+                  </p>
+                  <div id="shipSkills"></div>
+                  <div id="shipPassive"></div>
+                  <small><p id="shipNote" class="shipTextMuted"></p></small>
+                  <p id="shipQuote" class="shipTextMuted text-right"></p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div id="gameScreen" class="h-100">
-          <div
-            class="d-flex flex-column align-items-center justify-content-center h-100"
-          >
-            <canvas id="canvas"></canvas>
+        <div id="gameScreen" class="screenUnderStatusBar">
+          <div class="d-flex flex-column justify-content-around subScreenDVH">
+            <div id="gameRecord">
+              <div class="d-flex flex-row justify-content-between">
+                <button class="btn btn-primary" id="showRecordButton">
+                  记录
+                </button>
+                <button class="btn btn-primary" id="showCurrentTurnButton">
+                  本轮行动
+                </button>
+                <button class="btn btn-primary" id="showChatButton">
+                  聊天
+                </button>
+              </div>
+            </div>
+            <div id="gameBoard" class="d-flex flex-wrap flex-row">
+              <div class="placeholderLabel"></div>
+              <div class="verticalLabel" id="labelA">A</div>
+              <div class="verticalLabel" id="labelB">B</div>
+              <div class="verticalLabel" id="labelC">C</div>
+              <div class="verticalLabel" id="labelD">D</div>
+              <div class="verticalLabel" id="labelE">E</div>
+              <div class="verticalLabel" id="labelF">F</div>
+              <div class="verticalLabel" id="labelG">G</div>
+              <div class="verticalLabel" id="labelH">H</div>
+              <div class="horizontalLabel" id="label1">1</div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="1-1"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="1-2"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="1-3"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="1-4"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="1-5"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="1-6"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="1-7"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="1-8"></button>
+              </div>
+              <div class="horizontalLabel" id="label2">2</div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="2-1"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="2-2"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="2-3"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="2-4"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="2-5"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="2-6"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="2-7"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="2-8"></button>
+              </div>
+              <div class="horizontalLabel" id="label3">3</div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="3-1"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="3-2"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="3-3"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="3-4"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="3-5"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="3-6"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="3-7"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="3-8"></button>
+              </div>
+              <div class="horizontalLabel" id="label4">4</div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="4-1"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="4-2"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="4-3"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="4-4"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="4-5"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="4-6"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="4-7"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="4-8"></button>
+              </div>
+              <div class="horizontalLabel" id="label5">5</div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="5-1"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="5-2"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="5-3"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="5-4"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="5-5"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="5-6"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="5-7"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="5-8"></button>
+              </div>
+              <div class="horizontalLabel" id="label6">6</div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="6-1"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="6-2"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="6-3"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="6-4"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="6-5"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="6-6"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="6-7"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="6-8"></button>
+              </div>
+              <div class="horizontalLabel" id="label7">7</div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="7-1"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="7-2"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="7-3"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="7-4"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="7-5"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="7-6"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="7-7"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="7-8"></button>
+              </div>
+              <div class="horizontalLabel" id="label8">8</div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="8-1"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="8-2"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="8-3"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="8-4"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="8-5"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="8-6"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="8-7"></button>
+              </div>
+              <div class="gameGrid">
+                <button class="btn btn-info gameGridButton" id="8-8"></button>
+              </div>
+            </div>
+            <div id="gameMyState"></div>
+            <div id="gameFooter">
+              <div class="d-flex flex-row justify-content-between">
+                <button class="btn btn-primary" id="attackButton">攻击</button>
+                <button class="btn btn-primary" id="moveButton">移动</button>
+                <button class="btn btn-primary" id="buyButton">购买</button>
+                <button class="btn btn-primary" id="skillButton">特性</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </section>
+    </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
     <script src="client.js"></script>

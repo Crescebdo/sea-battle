@@ -11,65 +11,105 @@ const io = require("socket.io")(httpServer, {
   },
   allowEIO3: true,
 });
-const { initGameState } = require("./game");
+const { validateShipDecision } = require("./game");
 const { MIN_PLAYER_NUM, MAX_PLAYER_NUM, SHIP_SETTING } = require("./constants");
 const SHIP_COUNT = SHIP_SETTING.length;
-const { makeid } = require("./utils");
+const { makeRoomID, shuffleArray } = require("./utils");
 
-const gameState = {};
-const clientToRoom = {};
-const roomToClient = {}; // value: [{id, nickname}, ...]
+// stage - "waiting", "chooseShip", "chosenShip", "inGame"
+
+const pidLookup = {}; // lookup from client id to player id
+const players = {}; // pid -> {pid, cid, nickname, roomID, stage, ship }
+const rooms = {}; // roomID -> array of playerIDs (based on enter order)
 
 io.on("connection", (client) => {
+  let cid = client.id;
   client.on("newWaitingRoom", handleNewWaitingRoom);
   client.on("joinWaitingRoom", handleJoinWaitingRoom);
   client.on("enterGame", handleEnterGame); // game not active yet
   client.on("getShipInfo", handleGetShipInfo);
+  client.on("decideShip", handleDecideShip);
+  client.on("chosenGhost", handleChosenGhost);
 
   function handleNewWaitingRoom(nickname) {
-    if (clientToRoom[client.id]) {
+    if (toPID(cid)) {
       client.emit("error", "啊咧？你已经在等待室里了……", false);
       return;
     }
-    let gameCode = makeid(4);
-    clientToRoom[client.id] = gameCode;
-    roomToClient[gameCode] = [{ id: client.id, nickname: nickname }];
 
-    client.join(gameCode);
+    let roomID = makeRoomID(4);
+    while (rooms[roomID]) {
+      roomID = makeRoomID(4);
+    }
+    let pid = "P" + cid;
+    const player = {
+      pid,
+      cid,
+      nickname,
+      roomID,
+      stage: "waiting",
+    }; // current player object
+    players[pid] = player;
+    rooms[roomID] = [pid];
+    pidLookup[cid] = pid;
+
+    client.join(roomID);
     client.emit("enterWaitingRoom", {
-      gameCode: gameCode,
-      nicknameList: roomToClient[gameCode].map((c) => c.nickname),
+      roomID,
+      nicknameList: rooms[roomID].map((pid) => players[pid].nickname),
       minPlayerNum: MIN_PLAYER_NUM,
       maxPlayerNum: MAX_PLAYER_NUM,
-      isRoomMaster: roomToClient[gameCode][0].id === client.id,
+      isRoomMaster: rooms[roomID][0] === pid,
     });
   }
 
-  function handleJoinWaitingRoom({ gameCode, nickname }) {
-    const room = io.sockets.adapter.rooms.get(gameCode);
+  function handleJoinWaitingRoom({ roomID, nickname }) {
+    const room = io.sockets.adapter.rooms.get(roomID);
     let numClients = room ? room.size : 0;
     if (numClients === 0) {
       client.emit("error", "找不到该房间号……", true);
       return;
-    } else if (numClients >= MAX_PLAYER_NUM) {
-      client.emit("error", "来晚了！该房间人数已满", true);
-      return;
+    } else {
+      // handle ghost reconnect
+      if (rooms[roomID]) {
+        const ghosts = rooms[roomID].filter((pid) => players[pid].ghosted);
+        if (ghosts.length > 0) {
+          client.emit("chooseGhost", {
+            roomID,
+            nicknameList: ghosts.map((pid) => players[pid].nickname),
+          });
+          return;
+        }
+      }
+      if (numClients >= MAX_PLAYER_NUM) {
+        client.emit("error", "来晚了！该房间人数已满", true);
+        return;
+      }
     }
 
-    clientToRoom[client.id] = gameCode;
-    roomToClient[gameCode].push({ id: client.id, nickname: nickname });
+    let pid = "P" + cid;
+    const player = {
+      pid,
+      cid,
+      nickname,
+      roomID,
+      stage: "waiting",
+    }; // current player object
+    players[pid] = player;
+    rooms[roomID].push(pid);
+    pidLookup[cid] = pid;
 
-    client.join(gameCode);
-    io.to(gameCode).emit("enterWaitingRoom", {
-      gameCode: gameCode,
-      nicknameList: roomToClient[gameCode].map((c) => c.nickname),
+    client.join(roomID);
+    io.to(roomID).emit("enterWaitingRoom", {
+      roomID,
+      nicknameList: rooms[roomID].map((pid) => players[pid].nickname),
       minPlayerNum: MIN_PLAYER_NUM,
       maxPlayerNum: MAX_PLAYER_NUM,
     });
   }
 
   function handleGetShipInfo(shipNum) {
-    if (shipNum < 0 || shipNum >= SHIP_COUNT) {
+    if (isNaN(shipNum) || shipNum < 0 || shipNum >= SHIP_COUNT) {
       client.emit("error", "啊咧？找不到该船只信息……", false);
       return;
     }
@@ -77,55 +117,141 @@ io.on("connection", (client) => {
   }
 
   function handleEnterGame() {
-    // console.log(clientToRoom, client.id);
-    // console.log(clientToRoom.has(client.id));
-    if (!clientToRoom[client.id]) {
-      client.emit("error", "啊咧？你不在任何房间里，所以不能开始游戏……", true);
+    const player = validateConncetionInRoom();
+    if (!player) {
       return;
     }
-    let room = clientToRoom[client.id];
-    if (!roomToClient[room]) {
-      client.emit("error", "啊咧？当前房间不存在，所以不能开始游戏……", true);
-      return;
-    }
-    let clients = roomToClient[room];
-    if (clients.length < MIN_PLAYER_NUM) {
+    if (rooms[player.roomID].length < MIN_PLAYER_NUM) {
       client.emit("error", "啊咧？人数还不够哦", false);
       return;
     }
-    if (clients.length > MAX_PLAYER_NUM) {
+    if (rooms[player.roomID].length > MAX_PLAYER_NUM) {
       client.emit("error", "啊咧？当前房间人数已超过上限", true);
       return;
     }
-    gameState[room] = initGameState(clients);
-    io.to(room).emit("chooseShip");
+    shuffleArray(rooms[player.roomID]); // action turn order
+    for (const pid of rooms[player.roomID]) {
+      players[pid].stage = "chooseShip";
+    }
+    io.to(player.roomID).emit("chooseShip", {
+      totalPlayerCount: rooms[player.roomID].length,
+      roomID: player.roomID,
+    });
+  }
+
+  function handleDecideShip({ shipNum, width, height, row, col }) {
+    const [msg, reset] = validateShipDecision(shipNum, width, height, row, col);
+    if (msg) {
+      client.emit("error", msg, reset);
+    }
+    const player = validateConncetionInRoom();
+    if (!player) {
+      return;
+    }
+    player.ship = { shipNum, width, height, row, col };
+
+    updateReadyPlayerCount(player);
   }
 
   client.on("disconnecting", () => {
-    const rooms = client.rooms;
-    for (r of rooms) {
-      if (r === client.id) {
-        continue;
+    // console.log("toPID", toPID(cid));
+    if (!toPID(cid)) {
+      return;
+    }
+    const player = players[toPID(cid)]; // current player
+    // console.log("player", player, player.roomID);
+    if (!player || !player.roomID) {
+      return;
+    }
+    if (player.stage === "waiting") {
+      if (!rooms[player.roomID]) {
+        return;
       }
-      if (roomToClient[r]) {
-        roomToClient[r] = roomToClient[r].filter((c) => c.id !== client.id);
-        client.to(r).emit("enterWaitingRoom", {
+      rooms[player.roomID] = rooms[player.roomID].filter(
+        (pid) => pid !== player.pid
+      );
+      if (rooms[player.roomID].length > 0) {
+        client.to(player.roomID).emit("enterWaitingRoom", {
           minPlayerNum: MIN_PLAYER_NUM,
-          nicknameList: roomToClient[r].map((c) => c.nickname),
+          nicknameList: rooms[player.roomID].map(
+            (pid) => players[pid].nickname
+          ),
         });
-
-        // if room is not empty, update game master
-        if (roomToClient[r].length !== 0) {
-          io.to(roomToClient[r][0].id).emit("enterWaitingRoom", {
-            isRoomMaster: true,
-          });
-        } else {
-          delete roomToClient[r];
-        }
+        io.to(players[rooms[player.roomID][0]].cid).emit("enterWaitingRoom", {
+          isRoomMaster: true,
+        });
+      } else {
+        delete rooms[player.roomID];
+      }
+      delete pidLookup[player.pid];
+      delete players[player.pid];
+    } else {
+      player.ghosted = true;
+      if (player.stage === "chosenShip") {
+        updateReadyPlayerCount(player);
       }
     }
-    delete clientToRoom[client.id];
   });
+
+  function handleChosenGhost({ roomID, nickname }) {
+    if (!roomID || !rooms[roomID]) {
+      client.emit("error", "啊咧？房间不存在", true);
+      return;
+    }
+    const ghosts = rooms[roomID].filter((pid) => players[pid].ghosted);
+    const ghostIndex = ghosts.findIndex(
+      (pid) => players[pid].nickname === nickname
+    );
+    if (ghostIndex < 0) {
+      client.emit("error", "啊咧？选择的昵称不存在", true);
+      return;
+    }
+    const player = players[ghosts[ghostIndex]];
+    if (!player) {
+      client.emit("error", "啊咧？玩家不存在", true);
+      return;
+    }
+    client.emit("restore", )
+    console.log(+"重连");
+  }
+
+  function validateConncetionInRoom() {
+    const pid = toPID(cid);
+    if (!pid) {
+      client.emit("error", "啊咧？玩家不存在", true);
+      return;
+    }
+    const player = players[pid]; // current player
+    if (!player || !player.roomID || !rooms[player.roomID]) {
+      client.emit("error", "啊咧？你好像不在房间里……", true);
+      return;
+    }
+    return player;
+  }
+
+  function updateReadyPlayerCount(player) {
+    const readyPlayerCount = rooms[player.roomID].filter(
+      (pid) => !players[pid].ghosted && players[pid].ship
+    ).length;
+    const totalPlayerCount = rooms[player.roomID].length;
+    // if (readyPlayerCount === totalPlayerCount) {
+    //   // if everyone has chosen ship and no one disconnected, start!
+    //   for (const pid of rooms[player.roomID]) {
+    //     players[pid].stage = "inGame";
+    //   }
+    //   io.to(player.roomID).emit("startGame", "good!");
+    // } else {
+    player.stage = "chosenShip";
+    for (const pid of rooms[player.roomID].filter(
+      (pid) => players[pid].stage === "chosenShip"
+    )) {
+      io.to(players[pid].cid).emit(
+        "chosenShip",
+        readyPlayerCount,
+        totalPlayerCount
+      );
+    }
+  }
 });
 
 // function startGameInterval(roomName) {
@@ -143,3 +269,7 @@ io.on("connection", (client) => {
 // }
 
 io.listen(3000);
+
+function toPID(cid) {
+  return pidLookup[cid];
+}
