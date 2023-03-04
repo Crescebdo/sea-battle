@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>植吧海战大逃杀</title>
+    <title>海战大逃杀</title>
     <link
-      rel="icon"
+      rel="shortcut icon"
       type="image/x-icon"
-      href="/asset/images/icons/favicon.ico"
+      href="./asset/images/icons/favicon.ico"
     />
     <link
       rel="stylesheet"
@@ -18,6 +18,59 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <div id="infoModal" class="modal fade" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 id="infoModalTitle" class="modal-title"></h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div id="infoModalBody" class="modal-body"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-dismiss="modal">
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="confirmModal" class="modal fade" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 id="confirmModalTitle" class="modal-title"></h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div id="confirmModalBody" class="modal-body text-center"></div>
+          <div class="modal-footer">
+            <div class="d-flex flex-row justify-content-around w-100">
+              <button
+                id="confirmModalNoButton"
+                type="button"
+                class="btn btn-secondary"
+                data-dismiss="modal"
+              >
+                取消
+              </button>
+              <button
+                id="confirmModalYesButton"
+                type="button"
+                class="btn btn-primary"
+                data-dismiss="modal"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <main id="main">
       <div id="loadingScreen" class="h-100">
         <div
@@ -33,9 +86,9 @@
         >
           <h1 class="text-center">
             <span class="d-inline-block">欢迎来到</span
-            ><span class="d-inline-block">植吧海战大逃杀</span>
+            ><span class="d-inline-block">海战大逃杀</span>
           </h1>
-          <div>当前游戏版本：alpha 1.0, 2022/2/27</div>
+          <div>当前游戏版本：alpha 1.1, 2022/3/3</div>
           <div class="form-group">
             <input type="text" placeholder="输入昵称" id="nicknameInput" />
           </div>
@@ -258,7 +311,7 @@
                     确定
                   </button>
                 </div>
-                <div class="shipInfo">
+                <div id="shipInfo">
                   <h2 id="shipName"></h2>
                   <p>
                     <span id="shipSize"></span><br />
@@ -282,9 +335,12 @@
                 <button class="btn btn-primary" id="showRecordButton">
                   记录
                 </button>
-                <button class="btn btn-primary" id="showCurrentTurnButton">
-                  本轮行动
-                </button>
+                <div
+                  id="hint"
+                  class="flex-grow text-white text-center align-self-center"
+                >
+                  鲜血水晶杯的回合(1/8)
+                </div>
                 <button class="btn btn-primary" id="showChatButton">
                   聊天
                 </button>
@@ -515,7 +571,10 @@
       </div>
     </main>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="socket.io.js"></script>
+    <script src="jquery-3.5.1.slim.min.js"></script>
+    <script src="popper.min.js"></script>
+    <script src="bootstrap.min.js"></script>
     <script src="client.js"></script>
   </body>
 </html>

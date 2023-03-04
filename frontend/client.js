@@ -1,5 +1,5 @@
 /*global io */
-const DEBUG = true;
+const DEBUG = false;
 // const API_SERVER = "https://api.crescb.com";
 const API_SERVER = "http://localhost:3000";
 
@@ -24,7 +24,7 @@ let shipInfoCache = {};
 let myShip = {}; // shipNum, width, height, name, row, col
 let gameBoardInfo = {
   displayMode: "unknown",
-  noGo: { rows: new Set(), cols: new Set() },
+  noGo: { rows: [], cols: [] },
   shipPos: [],
 };
 
@@ -85,6 +85,7 @@ const shipSkills = document.getElementById("shipSkills");
 const shipPassive = document.getElementById("shipPassive");
 const shipNote = document.getElementById("shipNote");
 const shipQuote = document.getElementById("shipQuote");
+const shipInfo = document.getElementById("shipInfo");
 const decideShipTypeButton = document.getElementById("decideShipTypeButton");
 decideShipTypeButton.addEventListener("click", decideShipType);
 
@@ -137,7 +138,7 @@ const allScreens = [
 
 function handleError(msg, showInitialScreen) {
   if (showInitialScreen) displayInitialScreen();
-  alert(msg);
+  showInfoModal({ title: "出现异常", msg });
 }
 
 function handleChooseGhost({ roomID, nicknameList }) {
@@ -250,10 +251,11 @@ function handleChosenShip(readyPlayerCount, totalPlayerCount) {
   maxChosen.innerHTML = totalPlayerCount;
 }
 
-function handleStartGame(turnNum, weather) {
+function handleStartGame(turnNum, weather, debug) {
   displayGameScreen();
   updateStatusBar({ turnNum, weather });
   startTimer();
+  console.log(debug);
 }
 
 // button functions
@@ -261,7 +263,7 @@ function handleStartGame(turnNum, weather) {
 function newGame() {
   const nickname = nicknameInput.value;
   if (!nickname || nickname.length === 0) {
-    alert("昵称不可为空");
+    handleError("昵称不可为空", false);
     return;
   }
   socket.emit("newWaitingRoom", nickname);
@@ -270,23 +272,22 @@ function newGame() {
 function joinGame() {
   const nickname = nicknameInput.value;
   if (!nickname || nickname.length === 0) {
-    alert("昵称不可为空");
+    handleError("昵称不可为空", false);
     return;
   }
   const roomID = roomIDInput.value;
   if (!roomID || roomID.length === 0) {
-    alert("房间号不可为空");
+    handleError("房间号不可为空", false);
     return;
   }
   socket.emit("joinWaitingRoom", { roomID, nickname });
 }
 
 function enterGame() {
-  const confirmed = DEBUG || window.confirm("确认要开始游戏吗？");
-  if (!confirmed) {
-    return;
-  }
-  socket.emit("enterGame");
+  showConfirmModal({
+    msg: "确认要开始游戏吗？",
+    callback: () => socket.emit("enterGame"),
+  });
 }
 
 /* eslint-disable */
@@ -301,20 +302,25 @@ const showShipInfo = (shipNum) => {
 
 function decideShipType() {
   if (isNaN(myShip.shipNum)) {
-    alert("啊咧？尚未选择船只哦");
+    handleError("啊咧？尚未选择船只哦", false);
     return;
   }
   if (!shipInfoCache[myShip.shipNum]) {
-    alert("啊咧？找不到该船只的信息……");
+    handleError("啊咧？找不到该船只的信息……", false);
     return;
   }
-  myShip.width = shipInfoCache[myShip.shipNum].width;
-  myShip.height = shipInfoCache[myShip.shipNum].height;
-  myShip.name = shipInfoCache[myShip.shipNum].name;
+  showConfirmModal({
+    msg: `确认要选择${shipInfoCache[myShip.shipNum].name}吗？`,
+    callback: () => {
+      myShip.width = shipInfoCache[myShip.shipNum].width;
+      myShip.height = shipInfoCache[myShip.shipNum].height;
+      myShip.name = shipInfoCache[myShip.shipNum].name;
 
-  choosePosShipName.innerHTML = myShip.name;
-  choosePosShipSize.innerHTML = `${myShip.width}×${myShip.height}`;
-  displayChoosePosScreen();
+      choosePosShipName.innerHTML = myShip.name;
+      choosePosShipSize.innerHTML = `${myShip.width}&times;${myShip.height}`;
+      displayChoosePosScreen();
+    },
+  });
 }
 
 function clickGameGrid(row, col) {
@@ -326,13 +332,19 @@ function clickGameGrid(row, col) {
 
 function toggleShipDirection() {
   [myShip.width, myShip.height] = [myShip.height, myShip.width];
-  drawGameBoard({ ...myShip, gameBoardInfo });
+  drawGameBoard({ ...myShip, ...gameBoardInfo });
   moveShip(myShip);
-  choosePosShipSize.innerHTML = `${myShip.width}×${myShip.height}`;
+  choosePosShipSize.innerHTML = `${myShip.width}&times;${myShip.height}`;
 }
 
 function decideShipPosition() {
-  socket.emit("decideShip", myShip);
+  showConfirmModal({
+    msg: `确认要将船放在此位置吗？<br/><small><span class="d-inline-block">方向（横向/竖向）确定后，</span
+                  ><span class="d-inline-block"
+                    >在游戏过程中将无法再更改。</span
+                  ></small>`,
+    callback: () => socket.emit("decideShip", myShip),
+  });
 }
 
 // helper functions
@@ -354,6 +366,7 @@ function displayShipInfo(
     quote,
   }
 ) {
+  shipInfo.scrollTop = 0;
   myShip.shipNum = shipNum;
   let combinedName =
     '<span class="d-inline-block">' +
@@ -362,7 +375,7 @@ function displayShipInfo(
   for (let i = 0; i < health; i++) combinedName += "🩸";
   combinedName += "</span>";
   shipName.innerHTML = combinedName;
-  shipSize.innerHTML = "体积：" + width + "×" + height;
+  shipSize.innerHTML = "体积：" + width + "&times;" + height;
   let combinedAttack = "";
   if (cannon > 0) {
     combinedAttack += cannon + "门主炮";
@@ -411,12 +424,12 @@ function displayShipInfo(
 
 function drawGameBoard({ width, height, noGo, displayMode }) {
   if (!width || !height || width < 0 || height < 0) {
-    alert("啊咧？船只尺寸不合法");
+    handleError("啊咧？船只尺寸不合法", false);
     return;
   }
   for (let r = 1; r <= 8; r++)
     for (let c = 1; c <= 8; c++) {
-      if (noGo.rows.has(r)) {
+      if (noGo.rows.includes(r)) {
         gameGrids[r][c].disabled = true;
         gameGrids[r][c].classList.add("noGo");
       } else {
@@ -451,10 +464,10 @@ function moveShip({ row, col }) {
 
 function isGridDisabled(row, col, width, height, noGo) {
   if (
-    noGo.rows.has(row) ||
-    noGo.rows.has(row + height - 1) ||
-    noGo.cols.has(col) ||
-    noGo.cols.has(col + width) ||
+    noGo.rows.includes(row) ||
+    noGo.rows.includes(row + height - 1) ||
+    noGo.cols.includes(col) ||
+    noGo.cols.includes(col + width) ||
     row + height > 9 ||
     col + width > 9
   ) {
@@ -488,8 +501,8 @@ function closeAllExcept(activeScreen, hasStatusBar) {
   for (const screen of allScreens.filter((s) => s.id != activeScreen.id)) {
     screen.style.display = "none";
   }
-  activeScreen.style.display = "block";
   screenWithStatusBar.style.display = hasStatusBar ? "block" : "none";
+  activeScreen.style.display = "block";
   if (!hasStatusBar) hideTimer();
 }
 
@@ -603,4 +616,25 @@ function refreshVH() {
   for (const subScreen of subScreenDVH) {
     subScreen.style.height = window.innerHeight - 15 - headerHeight - 15 + "px";
   }
+}
+
+// display modal
+function showInfoModal({ title, msg }) {
+  $("#infoModalTitle").html(title);
+  $("#infoModalBody").html(msg);
+  $("#infoModal").modal("show");
+}
+
+function showConfirmModal({ title, msg, callback }) {
+  if (title) {
+    $("#confirmModalTitle").html(title);
+  } else {
+    $("#confirmModalTitle").hide();
+  }
+  $("#confirmModalBody").html(msg);
+  $("#confirmModalYesButton").unbind("click");
+  $("#confirmModalYesButton").on("click", () => {
+    callback();
+  });
+  $("#confirmModal").modal({ backdrop: "static", keyboard: false });
 }

@@ -1,5 +1,7 @@
 const MIN_PLAYER_NUM = 1;
 const MAX_PLAYER_NUM = 8;
+const MAX_NOGO_NUM = 8;
+const GAME_START_FISH_NUM = { min: 4, max: 6 };
 const SHIP_SETTING = [
   {
     name: "草船",
@@ -58,7 +60,7 @@ const SHIP_SETTING = [
       {
         skillName: "鄙视",
         description:
-          '<span class="hi">每回合限一次<span>，可消耗50节操，获知节操数最高的其它船只所处方向。',
+          '<span class="hi">每回合限一次</span>，可消耗50节操，获知节操数最高的其它船只所处方向。',
       },
     ],
     note: "为打造完美战舰的失败品之一，它最终仅仅成为了受人瞧不起的回收舰。实际上它拥有坚固的机甲和方便搭载武器的平台，无论是什么样的战斗都无法重创回收舰。+1s。",
@@ -120,7 +122,7 @@ const SHIP_SETTING = [
       {
         skillName: "体术",
         description:
-          '<span class="hi">攻击额外回合不可用。每回合限一次</span><small>（冰雹和冻结天气改为限两次）</small>，可对与你重叠的其它船只与杂鱼各造成1点伤害。对同一艘船至多依此法造成1点伤害。',
+          '<span class="hi">攻击额外回合不可用。每回合限一次</span><small>（冰雹与冻结天气改为限两次）</small>，可对与你重叠的其它船只与杂鱼各造成1点伤害。对同一艘船至多依此法造成1点伤害。',
       },
     ],
     passive: "无视冻结天气。",
@@ -144,7 +146,7 @@ const SHIP_SETTING = [
       {
         skillName: "诅咒",
         description:
-          '<span class="hi">每场游戏限一次</span>，被攻击后，可诅咒发动攻击的玩家。若如此做，下一轮开始时，通报该玩家被诅咒，天气改为浓雾，然后此轮所有特性和物品无效。',
+          '<span class="hi">每场游戏限一次</span>，被攻击后，可诅咒发动攻击的玩家。若如此做，下一轮开始时，通报该玩家被诅咒，天气改为浓雾，然后此轮所有特性与物品无效。',
       },
     ],
     passive: "无视冻结天气。",
@@ -221,9 +223,86 @@ const SHIP_SETTING = [
     quote: "“航空母舰这下牛逼了，增加了轰炸机和侦察机。”——HK",
   },
 ];
+const WEATHER = [
+  {
+    name: "浓雾",
+    description: "攻击与侦察距离为1。",
+  },
+  {
+    name: "雷雨",
+    description: "主炮的攻击范围为3&times;3（发动“暴击”时除外）。",
+  },
+  {
+    name: "晴天",
+    description: "飞机攻击范围为一列或一行。",
+  },
+  {
+    name: "暴雨",
+    description: "每只船的主炮与飞机最多各使用1次，并且航速-1。",
+  },
+  {
+    name: "顺风",
+    description: "所有船只航速+1。",
+  },
+  {
+    name: "赤潮",
+    description: "生成2~3只杂鱼。",
+  },
+  {
+    name: "星夜",
+    description: "所有玩家节操+50。",
+  },
+  {
+    name: "寒潮",
+    description: "下轮天气为冰雹，冻结或白雪。",
+  },
+  {
+    name: "冰雹",
+    description:
+      "本轮结束时，草船有25%概率受到1点伤害，其它船只有33%概率受到1点伤害（对潜水艇无效）。",
+  },
+  {
+    name: "冻结",
+    description: "船只无法移动（对潜水艇、破冰船、幽灵船无效）。",
+  },
+  {
+    name: "白雪",
+    description: "所有特性与物品无效。",
+  },
+  {
+    name: "极光",
+    description: "所有船只回复1血。",
+  },
+  {
+    name: "满月",
+    description:
+      "所有船只航速无限。所有船只增加1次攻击和特性发动次数。所有攻击方式伤害+1。所有船只回复1血。",
+  },
+];
+const WEATHER_WEIGHT_NORMAL = [
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  61 / 11,
+  2,
+  1,
+];
+const WEATHER_WEIGHT_COLD = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0];
 
 module.exports = {
   MIN_PLAYER_NUM,
   MAX_PLAYER_NUM,
+  MAX_NOGO_NUM,
+  GAME_START_FISH_NUM,
   SHIP_SETTING,
+  WEATHER,
+  WEATHER_WEIGHT_NORMAL,
+  WEATHER_WEIGHT_COLD,
 };

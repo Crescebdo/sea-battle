@@ -11,16 +11,22 @@ const io = require("socket.io")(httpServer, {
   },
   allowEIO3: true,
 });
-const { validateShipDecision } = require("./game");
+const {
+  validateShipDecision,
+  makeRoomID,
+  linkShip,
+  startGame,
+  initGame,
+} = require("./game");
 const { MIN_PLAYER_NUM, MAX_PLAYER_NUM, SHIP_SETTING } = require("./constants");
 const SHIP_COUNT = SHIP_SETTING.length;
-const { makeRoomID, shuffleArray } = require("./utils");
 
 // stage - "waiting", "chooseShip", "chosenShip", "inGame"
 
 const pidLookup = {}; // lookup from client id to player id
-const players = {}; // pid -> {pid, cid, nickname, roomID, stage, ship, ghosted }
+const players = {}; // pid -> {pid, cid, nickname, roomID, stage, shipID, ghosted }
 const rooms = {}; // roomID -> array of playerIDs (based on enter order)
+const games = {}; // roomID -> {objects, phases}
 
 io.on("connection", (client) => {
   let cid = client.id;
@@ -37,10 +43,7 @@ io.on("connection", (client) => {
       return;
     }
 
-    let roomID = makeRoomID(4);
-    while (rooms[roomID]) {
-      roomID = makeRoomID(4);
-    }
+    let roomID = makeRoomID(rooms);
     let pid = "P" + cid;
     const player = {
       pid,
@@ -133,7 +136,7 @@ io.on("connection", (client) => {
       client.emit("error", "啊咧？当前房间人数已超过上限", true);
       return;
     }
-    shuffleArray(rooms[player.roomID]); // action turn order
+    games[player.roomID] = initGame(rooms[player.roomID]);
     for (const pid of rooms[player.roomID]) {
       players[pid].stage = "chooseShip";
     }
@@ -152,7 +155,7 @@ io.on("connection", (client) => {
     if (!player) {
       return;
     }
-    player.ship = { shipNum, width, height, row, col };
+    player.ship = linkShip(games, player, { shipNum, width, height, row, col });
     player.stage = "chosenShip";
 
     updateReadyPlayerCount(player);
@@ -193,15 +196,17 @@ io.on("connection", (client) => {
     } else {
       player.ghosted = true;
       delete pidLookup[cid];
-      if (!rooms[player.roomID] || rooms[player.roomID].filter(pid => !players[pid].ghosted).length === 0) {
+      if (
+        !rooms[player.roomID] ||
+        rooms[player.roomID].filter((pid) => !players[pid].ghosted).length === 0
+      ) {
         // All ghosted, delete rooom
         for (const pid of rooms[player.roomID]) {
           delete pidLookup[pid];
           delete players[pid];
         }
         delete rooms[player.roomID];
-      }
-      else if (player.stage === "chosenShip") {
+      } else if (player.stage === "chosenShip") {
         updateReadyPlayerCount(player);
       }
     }
@@ -259,7 +264,9 @@ io.on("connection", (client) => {
       for (const pid of rooms[player.roomID]) {
         players[pid].stage = "inGame";
       }
-      io.to(player.roomID).emit("startGame", 1, "晴天");
+      startGame(games[player.roomID]);
+      let game = games[player.roomID];
+      io.to(player.roomID).emit("startGame", 1, "晴天", game);
     } else {
       for (const pid of rooms[player.roomID].filter(
         (pid) => players[pid].stage === "chosenShip"

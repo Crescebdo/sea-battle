@@ -32,6 +32,7 @@ input {
   }
 }
 
+#initialScreen,
 #screenWithStatusBar {
   padding: 15px;
 }
@@ -71,7 +72,7 @@ input {
   color: white;
 }
 
-.shipInfo {
+#shipInfo {
   overflow-y: auto;
 }
 
@@ -223,6 +224,7 @@ input {
 }
 
 .gameGridButton:not(:disabled):not(.disabled):focus,
+.gameGridButton:not(:disabled):not(.disabled):hover,
 .gameGridButton:not(:disabled):not(.disabled):active {
   background-color: #17a2b8 !important;
   border-color: aqua !important;
@@ -251,4 +253,8 @@ input {
 
 #gameFooter button {
   font-size: 1.25rem;
+}
+
+#hint {
+  max-width: 50%;
 }
