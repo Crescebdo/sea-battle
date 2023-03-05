@@ -17,23 +17,31 @@ const {
   linkShip,
   startGame,
   initGame,
+  lastElem,
+  startInTurn,
+  getPhase,
+  getPlayer,
 } = require("./game");
 const { MIN_PLAYER_NUM, MAX_PLAYER_NUM, SHIP_SETTING } = require("./constants");
 const SHIP_COUNT = SHIP_SETTING.length;
 
 // stage - "waiting", "chooseShip", "chosenShip", "inGame"
 
+const sockets = {};
 const pidLookup = {}; // lookup from client id to player id
-const players = {}; // pid -> {pid, cid, nickname, roomID, stage, shipID, ghosted }
+const players = {}; // pid -> {pid, cid, nickname, roomID, stage, ghosted }
 const rooms = {}; // roomID -> array of playerIDs (based on enter order)
 const games = {}; // roomID -> {objects, phases}
 
 io.on("connection", (client) => {
   let cid = client.id;
+  sockets[cid] = client;
   client.on("newWaitingRoom", handleNewWaitingRoom);
   client.on("joinWaitingRoom", handleJoinWaitingRoom);
   client.on("enterGame", handleEnterGame); // game not active yet
-  client.on("getShipInfo", handleGetShipInfo);
+  client.on("getShipSetting", (shipNum) =>
+    client.emit("shipSetting", SHIP_SETTING, shipNum)
+  );
   client.on("decideShip", handleDecideShip);
   client.on("chosenGhost", handleChosenGhost);
 
@@ -109,14 +117,7 @@ io.on("connection", (client) => {
       minPlayerNum: MIN_PLAYER_NUM,
       maxPlayerNum: MAX_PLAYER_NUM,
     });
-  }
-
-  function handleGetShipInfo(shipNum) {
-    if (isNaN(shipNum) || shipNum < 0 || shipNum >= SHIP_COUNT) {
-      client.emit("error", "啊咧？找不到该船只信息……", false);
-      return;
-    }
-    client.emit("shipInfo", shipNum, SHIP_SETTING[shipNum]);
+    console.log(`Room ${player.roomID} - ${cid} 进入等待室`);
   }
 
   function handleEnterGame() {
@@ -136,14 +137,16 @@ io.on("connection", (client) => {
       client.emit("error", "啊咧？当前房间人数已超过上限", true);
       return;
     }
-    games[player.roomID] = initGame(rooms[player.roomID]);
+    games[player.roomID] = initGame(players, rooms[player.roomID]);
     for (const pid of rooms[player.roomID]) {
       players[pid].stage = "chooseShip";
     }
     io.to(player.roomID).emit("chooseShip", {
       totalPlayerCount: rooms[player.roomID].length,
       roomID: player.roomID,
+      SHIP_SETTING,
     });
+    console.log(`Room ${player.roomID} - ${cid} 开始游戏`);
   }
 
   function handleDecideShip({ shipNum, width, height, row, col }) {
@@ -155,7 +158,7 @@ io.on("connection", (client) => {
     if (!player) {
       return;
     }
-    player.ship = linkShip(games, player, { shipNum, width, height, row, col });
+    linkShip(games, player, { shipNum, width, height, row, col });
     player.stage = "chosenShip";
 
     updateReadyPlayerCount(player);
@@ -236,6 +239,7 @@ io.on("connection", (client) => {
     client.emit("restore", {
       ...player,
       totalPlayerCount: rooms[roomID].length,
+      SHIP_SETTING,
     });
     updateReadyPlayerCount(player);
     console.log(player.nickname + " 重连成功");
@@ -257,7 +261,7 @@ io.on("connection", (client) => {
 
   function updateReadyPlayerCount(player) {
     const readyPlayerCount = rooms[player.roomID].filter(
-      (pid) => !players[pid].ghosted && players[pid].ship
+      (pid) => !players[pid].ghosted && players[pid].stage === "chosenShip"
     ).length;
     const totalPlayerCount = rooms[player.roomID].length;
     if (readyPlayerCount >= totalPlayerCount) {
@@ -265,8 +269,7 @@ io.on("connection", (client) => {
         players[pid].stage = "inGame";
       }
       startGame(games[player.roomID]);
-      let game = games[player.roomID];
-      io.to(player.roomID).emit("startGame", 1, "晴天", game);
+      emitPhase(player.roomID);
     } else {
       for (const pid of rooms[player.roomID].filter(
         (pid) => players[pid].stage === "chosenShip"
@@ -279,24 +282,73 @@ io.on("connection", (client) => {
       }
     }
   }
+
+  async function waitAndFire(roomID) {
+    if (
+      !games[roomID] ||
+      !games[roomID].phases ||
+      !lastElem(games[roomID].phases).duration
+    ) {
+      io.to(roomID).emit("error", "啊咧？找不到当前阶段", true);
+      return;
+    }
+    const duration = lastElem(games[roomID].phases).duration;
+    console.log(`Room ${roomID} - 等待 ${duration} 秒`);
+    await new Promise((resolve) => setTimeout(resolve, duration * 1000));
+    if (
+      !games[roomID] ||
+      !games[roomID].phases ||
+      !lastElem(games[roomID].phases).nextPhase
+    ) {
+      io.to(roomID).emit("error", "啊咧？找不到当前阶段", true);
+      return;
+    }
+    const nextPhase = lastElem(games[roomID].phases).nextPhase;
+    if (nextPhase.intent === "inTurn") {
+      startInTurn(games[roomID], nextPhase.pid);
+      emitPhase(roomID);
+    } else {
+      console.log(`Room ${roomID} - 没有下一阶段`);
+      return;
+    }
+  }
+
+  function emitPhase(roomID) {
+    const game = games[roomID];
+    if (!game) {
+      io.to(roomID).emit("error", "啊咧？无法找到游戏房间", true);
+      return;
+    }
+    const board = game.board;
+    for (const { pid } of games[roomID].players) {
+      const [phase, player] = [getPhase(game, pid), getPlayer(game, pid)];
+      if (!phase || !board || !player) {
+        io.to(roomID).emit("error", "啊咧？获取游戏信息失败", true);
+        return;
+      }
+      if (phase.done) {
+        console.log(`Room ${roomID} - 当前阶段已完成`);
+        return;
+      }
+      const targetCID = toCID(pid);
+      if (!targetCID || !sockets[targetCID]) {
+        console.log(`Room ${roomID} - 未能发送至 ${targetCID}`);
+        return;
+      }
+      sockets[targetCID].emit("updateGame", { phase, board, player });
+    }
+    console.log(`Room ${roomID} - 发送 ${lastElem(game.phases).type}`);
+    game.phases[game.phases.length - 1].done = true;
+    waitAndFire(roomID);
+  }
 });
-
-// function startGameInterval(roomName) {
-//   const intervalId = setInterval(() => {
-//     const winner = gameLoop(state[roomName]);
-
-//     if (!winner) {
-//       emitGameState(roomName, state[roomName]);
-//     } else {
-//       emitGameOver(roomName, winner);
-//       state[roomName] = null;
-//       clearInterval(intervalId);
-//     }
-//   }, 1000 / FRAME_RATE);
-// }
 
 io.listen(3000);
 
 function toPID(cid) {
   return pidLookup[cid];
+}
+
+function toCID(pid) {
+  return Object.keys(pidLookup).find((key) => pidLookup[key] === pid);
 }

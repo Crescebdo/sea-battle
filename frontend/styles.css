@@ -45,15 +45,14 @@ input {
   padding-bottom: 5px;
 }
 
-#statusTurnNumLine,
-#statusRoomLine,
+#statusRoundNumLine,
 #statusTimerLine {
   visibility: hidden;
   flex: 1;
 }
 
 .hi {
-  color: yellow;
+  color: #61eaff;
 }
 
 #shipPanelLeft {
@@ -161,11 +160,11 @@ input {
 /* game screen */
 
 #gameHeader {
-  margin-top: 15px;
+  /* margin-top: 15px; */
 }
 
 #gameRecord {
-  margin-top: 10px;
+  /* margin-top: 10px; */
 }
 
 #gameRecord button {
@@ -177,7 +176,7 @@ input {
   height: 100vw;
   margin-left: -15px;
   margin-right: -15px;
-  margin-top: 15px;
+  /* margin-top: 15px; */
 }
 
 .placeholderLabel {
@@ -241,20 +240,52 @@ input {
 }
 
 #gameMyState {
-  flex-grow: 3;
-  background-color: grey;
-  margin-top: 15px;
+  /* flex-grow: 3; */
+  /* margin-top: 15px; */
   max-height: 50vw;
 }
 
 #gameFooter {
-  margin-top: 15px;
+  /* margin-top: 15px; */
 }
 
 #gameFooter button {
   font-size: 1.25rem;
 }
 
-#hint {
+#gameHint {
   max-width: 50%;
+}
+
+#gameProgress {
+  margin-top: 1vh;
+  height: 1vh;
+}
+
+#gameProgress .progress-bar {
+  background-color: #14a2b8;
+}
+
+#gameShipImg {
+  width: 11vh;
+  height: 11vh;
+  border-radius: 50%;
+}
+
+.lt {
+  font-size: 1.25rem;
+}
+
+#gameStateLeft,
+#gameStateMid,
+#gameStateRight {
+  flex: 1;
+}
+
+.notransition {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  -ms-transition: none !important;
+  transition: none !important;
 }

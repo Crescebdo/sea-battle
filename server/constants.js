@@ -295,6 +295,10 @@ const WEATHER_WEIGHT_NORMAL = [
   1,
 ];
 const WEATHER_WEIGHT_COLD = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0];
+const SHORT_WAIT_TIME = 10; // in seconds
+const SHOP_TIME = 20;
+const TURN_TIME = 10;
+const INFO_TIME = 8;
 
 module.exports = {
   MIN_PLAYER_NUM,
@@ -305,4 +309,8 @@ module.exports = {
   WEATHER,
   WEATHER_WEIGHT_NORMAL,
   WEATHER_WEIGHT_COLD,
+  SHORT_WAIT_TIME,
+  SHOP_TIME,
+  TURN_TIME,
+  INFO_TIME,
 };

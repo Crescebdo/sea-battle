@@ -4,6 +4,10 @@ module.exports = {
   linkShip,
   initGame,
   startGame,
+  lastElem,
+  startInTurn,
+  getPhase,
+  getPlayer,
 };
 
 const {
@@ -13,6 +17,10 @@ const {
   WEATHER,
   WEATHER_WEIGHT_NORMAL,
   WEATHER_WEIGHT_COLD,
+  SHORT_WAIT_TIME,
+  SHOP_TIME,
+  TURN_TIME,
+  INFO_TIME,
 } = require("./constants");
 
 function validateShipDecision(shipNum, width, height, row, col) {
@@ -68,9 +76,9 @@ function makeObjectID(objects) {
 }
 
 function linkShip(games, player, { shipNum, width, height, row, col }) {
-  const objectID = makeObjectID(games[player.roomID].objects);
-  games[player.roomID].objects[objectID] = {
-    oid: objectID,
+  const game = games[player.roomID];
+  const newShipID = makeObjectID(game.objects);
+  game.objects[newShipID] = {
     pid: player.pid,
     typeName: "boat",
     typeNum: shipNum,
@@ -87,13 +95,17 @@ function linkShip(games, player, { shipNum, width, height, row, col }) {
     health: SHIP_SETTING[shipNum].health,
     skills: SHIP_SETTING[shipNum].skills.map((s) => s.skillName),
   };
-  return objectID;
+  for (const p of game.players) {
+    if (p.pid === player.pid) {
+      p.shipID = newShipID;
+      break;
+    }
+  }
 }
 
 function linkFish(game, row, col) {
   const objectID = makeObjectID(game.objects);
   game.objects[objectID] = {
-    oid: objectID,
     typeName: "fish",
     row,
     col,
@@ -101,10 +113,9 @@ function linkFish(game, row, col) {
     height: 1,
     health: 1,
   };
-  return objectID;
 }
 
-function initGame(playerList) {
+function initGame(players, playerList) {
   return {
     objects: {},
     phases: [],
@@ -112,33 +123,87 @@ function initGame(playerList) {
       noGo: { rows: [], cols: [] },
       weather: "",
       roundNum: 1,
-      turnNum: 0,
     },
-    notifs: { past: [], curr: [] },
-    players: shuffleArray(playerList).map((pid) => ({ pid, moral: 0 })), // 起始节操为0
+    notif: { log: "", curr: "" },
+    players: shuffleArray(playerList).map((pid, idx) => ({
+      pid,
+      startingIndex: idx,
+      nickname: players[pid].nickname,
+      moral: 0, // 起始节操为0
+      shipID: null,
+    })),
   };
 }
 
 function startGame(game) {
+  initNotif({ game, title: "第一轮开始" });
   updateNoGo(game);
-  generateFish(game, GAME_START_FISH_NUM.min, GAME_START_FISH_NUM.max + 1);
-  startNewTurn({ game, skipUpdateNoGo: true });
+  generateFish(game, GAME_START_FISH_NUM.min, GAME_START_FISH_NUM.max);
+  initNewRound({ game, skipUpdateNoGo: true });
+  game.phases.push({
+    type: "wait", // wait, shop, turn
+    startTime: Date.now(),
+    duration: SHORT_WAIT_TIME,
+    modal: { title: "通报", msg: game.notif.curr, duration: INFO_TIME },
+    hint: "第一轮开始",
+    nextPhase: { intent: "inTurn", pid: game.players[0].pid },
+    startGame: true,
+  });
 }
 
-function startNewTurn({ game, skipUpdateNoGo }) {
+function startInTurn(game, pid) {
+  const playerIndex = game.players.findIndex((p) => p.pid === pid);
+  const nickname = game.players[playerIndex].nickname;
+  if (game.board.roundNum === 1 && playerIndex === 0) {
+    initNotif({ game, title: `${nickname}的回合` });
+    addNotif({ game, msg: `${playerIndex + 1}号玩家${nickname}的回合开始。` });
+  }
+  game.phases.push({
+    type: "turn",
+    turnOwner: { pid, nickname },
+    startTime: Date.now(),
+    duration: TURN_TIME,
+    modal: game.notif.curr
+      ? { title: "通报", msg: game.notif.curr, duration: INFO_TIME }
+      : null,
+    hint: `${nickname}的回合(${playerIndex + 1}/${game.players.length})`,
+    nextPhase: { intent: "turnEnd", pid },
+  });
+}
+
+function initNewRound({ game, skipUpdateNoGo }) {
   if (!skipUpdateNoGo) updateNoGo(game);
   updateWeather(game);
 }
 
 function updateWeather(game) {
-  let newWeather = "";
-  if (game.board.weather === "cold") {
+  let newWeather;
+  if (game.board.weather === "寒潮") {
     newWeather = weightedRandom(WEATHER, WEATHER_WEIGHT_COLD);
   } else {
     newWeather = weightedRandom(WEATHER, WEATHER_WEIGHT_NORMAL);
   }
-  game.board.weather = newWeather;
-  addNotif(game, "新天气", `${newWeather}。`);
+  game.board.weather = newWeather.name;
+  addNotif({
+    game,
+    title: "天气",
+    msg: `新天气为<span class="text-info">${newWeather.name}</span>：${newWeather.description}`,
+  });
+  updateInstantWeatherEffect(game, newWeather.name);
+}
+
+function updateInstantWeatherEffect(game, weather) {
+  if (weather === "赤潮") {
+    generateFish(game, 2, 3);
+  } else if (weather === "星夜") {
+    for (let p of game.players) {
+      p.moral += 50;
+    }
+  } else if (weather === "极光" || weather === "满月") {
+    for (let o of Object.values(game.objects)) {
+      if (o.typeName === "boat") o.health += 1;
+    }
+  }
 }
 
 function updateNoGo(game) {
@@ -167,19 +232,23 @@ function updateNoGo(game) {
       );
     }
   });
-  shuffleArray(possibleNoGos);
+  possibleNoGos = shuffleArray(possibleNoGos).slice(0, 2);
+  possibleNoGos.sort((a, b) => {
+    a.type < b.type || (a.type === b.type && a.num > b.num) ? 1 : -1;
+  });
   let notifStr = "";
-  for (const noGo of possibleNoGos.slice(0, 2)) {
+  for (const noGo of possibleNoGos) {
     if (noGo.type === "row") {
       notifStr += (notifStr.length === 0 ? "" : "、") + `第${noGo.num}行`;
       game.board.noGo.rows.push(noGo.num);
     } else if (noGo.type === "col") {
-      notifStr += (notifStr.length === 0 ? "" : "、") + `第${noGo.num}列`;
+      notifStr +=
+        (notifStr.length === 0 ? "" : "、") + `第${toLetter(noGo.num)}列`;
       game.board.noGo.cols.push(noGo.num);
     }
   }
   if (notifStr.length > 0) {
-    addNotif(game, "新禁区", notifStr + "已被设为禁区。");
+    addNotif({ game, title: "禁区", msg: notifStr + "已被设为禁区。" });
   }
 }
 
@@ -199,8 +268,34 @@ function generatePossibleNoGos(type, currNoGos) {
   }
 }
 
+// Hide sensitive info
+function getPhase(game, pid) {
+  if (!game.phases) return;
+  let phase = { ...lastElem(game.phases) };
+  phase.nextPhase = undefined;
+  if (phase.turnOwner) {
+    phase.isTurnOwner = pid === phase.turnOwner.pid;
+    phase.turnOwner = undefined;
+  }
+  return phase;
+}
+
+function getPlayer(game, pid) {
+  if (!game.players) return;
+  const index = game.players.findIndex((p) => p.pid === pid);
+  if (index < 0) return;
+  let player = game.players[index];
+  if (!player.shipID || !game.objects[player.shipID]) return;
+  player = { ...player, ship: game.objects[player.shipID] };
+  player.shipID = undefined;
+  player.ship.pid = undefined;
+  player.pid = undefined;
+  return player;
+}
+
+// [min, max]
 function generateFish(game, min, max) {
-  const fishNum = getRandomInt(min, max);
+  const fishNum = getRandomInt(min, max + 1);
   for (let i = 0; i < fishNum; i++) {
     let [row, col] = [getRandomInt(1, 9), getRandomInt(1, 9)];
     while (
@@ -213,12 +308,23 @@ function generateFish(game, min, max) {
   }
 }
 
-function addNotif(game, title, msg) {
-  game.notifs.curr.push({ title, msg });
+function addNotif({ game, title, msg }) {
+  let str = "<p>";
+  if (title) str += `【${title}】`;
+  str += `${msg}</p>`;
+  game.notif.curr += str;
+  game.notif.log += str;
 }
 
+function initNotif({ game, title }) {
+  game.notif.curr = `<h4>${title}</h4>`;
+  game.notif.log += `<h4>${title}</h4>`;
+}
+
+// utils
+
 function getRandomInt(min, max) {
-  return Math.floor(Math.random() * (max - min) + min); // The maximum is exclusive and the minimum is inclusive
+  return Math.floor(Math.random() * (max - min) + min); // [min, max)
 }
 
 function shuffleArray(array) {
@@ -237,4 +343,12 @@ function weightedRandom(items, weights) {
       return items[itemIndex];
     }
   }
+}
+
+function toLetter(num) {
+  return String.fromCharCode("A".charCodeAt(0) + num - 1);
+}
+
+function lastElem(arr) {
+  return arr[arr.length - 1];
 }

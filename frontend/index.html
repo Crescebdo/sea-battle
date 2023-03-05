@@ -30,7 +30,9 @@
           <div id="infoModalBody" class="modal-body"></div>
           <div class="modal-footer">
             <button type="button" class="btn btn-primary" data-dismiss="modal">
-              确定
+              确定<span id="infoModalTimer"
+                >(<span id="infoModalTime"></span>)</span
+              >
             </button>
           </div>
         </div>
@@ -145,13 +147,14 @@
       <div id="screenWithStatusBar" class="w-100 h-100 bg-dark">
         <div id="statusBar">
           <div class="d-flex flex-row justify-content-between text-white">
-            <div id="statusTurnNumLine" class="text-left">
-              <small>第</small><span id="statusTurnNum"></span><small>轮</small>
+            <div id="statusRoundNumLine" class="text-left">
+              <small>第</small><span id="statusRoundNum"></span
+              ><small>轮</small>
               <span id="statusWeather"></span>
             </div>
             <div id="statusRoomLine" class="text-center">
               <small
-                ><span id="statusTotalPlayerCount"></span>人竞技赛 (<span
+                ><span id="statusTotalPlayerCount"></span>人竞技赛(<span
                   id="statusRoomID"
                 ></span
                 >)</small
@@ -336,11 +339,9 @@
                   记录
                 </button>
                 <div
-                  id="hint"
-                  class="flex-grow text-white text-center align-self-center"
-                >
-                  鲜血水晶杯的回合(1/8)
-                </div>
+                  id="gameHint"
+                  class="flex-grow hi text-center align-self-center"
+                ></div>
                 <button class="btn btn-primary" id="showChatButton">
                   聊天
                 </button>
@@ -557,7 +558,61 @@
                 <button class="btn btn-info gameGridButton" id="8-8"></button>
               </div>
             </div>
-            <div id="gameMyState"></div>
+            <div id="gameProgress" class="progress w-100">
+              <div
+                id="gameProgressBar"
+                class="progress-bar notransition"
+                role="progressbar"
+              ></div>
+            </div>
+            <div
+              id="gameMyState"
+              class="d-flex flex-row text-white text-center justify-content-around"
+            >
+              <div
+                id="gameStateLeft"
+                class="d-flex flex-column justify-content-around align-items-center"
+              >
+                <div class="shipTextMuted">
+                  <span id="gamePlayerIndex"> </span><small>号位</small>
+                </div>
+                <img id="gameShipImg" />
+                <small id="gameShipCaption" class="shipTextMuted"></small>
+              </div>
+              <div
+                id="gameStateMid"
+                class="d-flex flex-column justify-content-around"
+              >
+                <div id="gameHealth" class="lt"></div>
+                <div>节操：<span id="gameMoral" class="lt"></span></div>
+                <div id="gameStateMidDummy" class="invisible lt">占位</div>
+              </div>
+              <div
+                id="gameStateRight"
+                class="d-flex flex-column justify-content-around"
+              >
+                <div>
+                  航速：<span id="gameSpeedCurr" class="lt"></span>/<span
+                    id="gameSpeedMax"
+                  ></span>
+                </div>
+                <div id="gameCannonLine">
+                  主炮：<span id="gameCannonCurr" class="lt"></span>/<span
+                    id="gameCannonMax"
+                  ></span>
+                </div>
+                <div id="gameTorpedoLine">
+                  鱼雷：<span id="gameTorpedoCurr" class="lt"></span>/<span
+                    id="gameTorpedoMax"
+                  ></span>
+                </div>
+                <div id="gameAircraftLine">
+                  飞机：<span id="gameAircraftCurr" class="lt"></span>/<span
+                    id="gameAircraftMax"
+                  ></span>
+                </div>
+              </div>
+            </div>
             <div id="gameFooter">
               <div class="d-flex flex-row justify-content-between">
                 <button class="btn btn-primary" id="attackButton">攻击</button>
@@ -572,7 +627,7 @@
     </main>
 
     <script src="socket.io.js"></script>
-    <script src="jquery-3.5.1.slim.min.js"></script>
+    <script src="jquery-3.5.1.min.js"></script>
     <script src="popper.min.js"></script>
     <script src="bootstrap.min.js"></script>
     <script src="client.js"></script>
