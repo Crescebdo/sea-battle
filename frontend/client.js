@@ -27,10 +27,16 @@ let timerIntervalID;
 let shipSetting = [];
 let myShip = {}; // shipNum, width, height, name, row, col
 let gameBoardDisplay = {
-  displayMode: "unknown",
+  prevDisplayMode: "",
   noGo: { rows: [], cols: [] },
   shipPos: [], // all grids of previous ship
+  gridDist: new Array(9).fill(-1).map(() => new Array(9).fill(-1)),
 };
+let currPhase = {};
+let currBoard = {};
+let currPlayer = {};
+let gameLog = "";
+let scrollInfoModalToBottom = false;
 
 // VH resize
 const mainContents = document.getElementById("main");
@@ -144,7 +150,25 @@ for (let r = 1; r <= 8; r++) {
   }
 }
 const gameHint = document.getElementById("gameHint");
-const gameProgressBar = document.getElementById("gameProgressBar");
+const myShipButton = document.getElementById("myShipButton");
+const attackDropdown = document.getElementById("attackDropdown");
+const moveButton = document.getElementById("moveButton");
+const shopButton = document.getElementById("shopButton");
+const skillButton = document.getElementById("skillButton");
+const showLogButton = document.getElementById("showLogButton");
+const helpButton = document.getElementById("helpButton");
+const cannonAttack = document.getElementById("cannonAttack");
+const torpedoAttack = document.getElementById("torpedoAttack");
+const aircraftAttack = document.getElementById("aircraftAttack");
+const aircraftDetect = document.getElementById("aircraftDetect");
+showLogButton.addEventListener("click", onShowLog);
+moveButton.addEventListener("click", onMoveButton);
+shopButton.addEventListener("click", onShopButton);
+skillButton.addEventListener("click", onSkillButton);
+cannonAttack.addEventListener("click", (e) => onAttackButton(e, "主炮"));
+torpedoAttack.addEventListener("click", (e) => onAttackButton(e, "鱼雷"));
+aircraftAttack.addEventListener("click", (e) => onAttackButton(e, "飞机"));
+aircraftDetect.addEventListener("click", (e) => onDetectButton(e));
 
 const allScreens = [
   loadingScreen,
@@ -155,6 +179,19 @@ const allScreens = [
   choosePosScreen,
   chooseShipScreen,
   gameScreen,
+];
+const allGameButtons = [
+  showLogButton,
+  helpButton,
+  myShipButton,
+  attackDropdown,
+  moveButton,
+  shopButton,
+  skillButton,
+  cannonAttack,
+  torpedoAttack,
+  aircraftAttack,
+  aircraftDetect,
 ];
 
 // handlers
@@ -189,7 +226,7 @@ function handleRestore({
   totalPlayerCount,
   roomID,
   ship,
-  SHIP_SETTING,
+  // SHIP_SETTING,
 }) {
   if (stage === "chooseShip") {
     displayChooseShipScreen();
@@ -274,8 +311,27 @@ function handleChosenShip(readyPlayerCount, totalPlayerCount) {
   maxChosen.innerHTML = totalPlayerCount;
 }
 
+// JSON doesn't allow Infinity, need manual conversion
+function convertInfinity(player) {
+  if (player.ship && player.ship.speed === null) player.ship.speed = Infinity;
+  if (player.ship && player.ship.attackDist) {
+    Object.keys(player.ship.attackDist).forEach((key) => {
+      if (player.ship.attackDist[key] === null)
+        player.ship.attackDist[key] = Infinity;
+    });
+  }
+  if (player.ship && player.ship.aircraftDetectDist === null)
+    player.ship.aircraftDetectDist = Infinity;
+}
+
 function handleUpdateGame({ phase, board, player }) {
-  console.log(phase, board);
+  convertInfinity(player);
+
+  phase.duration =
+    (phase.startTime + phase.duration * 1000 - Date.now()) / 1000; // adjust duration
+  console.log(phase);
+
+  [currPhase, currBoard, currPlayer] = [phase, board, player];
   if (phase.startGame) {
     displayGameScreen();
     startTimer();
@@ -284,10 +340,11 @@ function handleUpdateGame({ phase, board, player }) {
   updateStatusBar({ ...board });
   updateHint({ ...phase });
   updateGameBoard({ phase, board });
-  console.log(player);
   updateState({ ...player });
+  updateButtons({ ...phase });
   if (phase.modal) {
     showInfoModal({ ...phase.modal });
+    gameLog += phase.modal.msg;
   }
 }
 
@@ -357,7 +414,7 @@ function decideShipType() {
 }
 
 function clickGameGrid(row, col) {
-  if (gameBoardDisplay.displayMode === "move") {
+  if (gameBoardDisplay.prevDisplayMode === "move") {
     moveShip({ row, col });
     decidePosButton.disabled = false;
   }
@@ -365,22 +422,39 @@ function clickGameGrid(row, col) {
 
 function toggleShipDirection() {
   [myShip.width, myShip.height] = [myShip.height, myShip.width];
-  drawGameBoard({ ...myShip, ...gameBoardDisplay });
+  drawGameBoard({ ...myShip, ...gameBoardDisplay, displayMode: "move" });
   moveShip(myShip);
   choosePosShipSize.innerHTML = `${myShip.width}&times;${myShip.height}`;
 }
 
 function decideShipPosition() {
   showConfirmModal({
-    msg: `确认要将船放在此位置吗？<br/><small><span class="d-inline-block">方向（横向/竖向）确定后，</span
-                  ><span class="d-inline-block"
-                    >在游戏过程中将无法再更改</span
-                  ></small>`,
+    msg: `确认要将船放在此位置吗？${linebreak}<small>${suggestLineBreak(
+      "方向（横向/竖向）确定后，",
+      "在游戏过程中将无法再更改"
+    )}</small>`,
     callback: () => socket.emit("decideShip", myShip),
   });
 }
 
 // helper functions
+
+// take in multiple strings, suggest line break in between
+function suggestLineBreak(...strs) {
+  let res = "";
+  for (const str of strs) {
+    res += `<span class="d-inline-block">${str}</span>`;
+  }
+  return res;
+}
+
+function toTextInfo(str) {
+  return `<span class="text-info">${str}</span>`;
+}
+
+function linebreak() {
+  return "<br/>";
+}
 
 function displayShipInfo(
   shipNum,
@@ -401,13 +475,7 @@ function displayShipInfo(
 ) {
   shipInfo.scrollTop = 0;
   myShip.shipNum = shipNum;
-  let combinedName =
-    '<span class="d-inline-block">' +
-    name +
-    '</span><span class="d-inline-block">';
-  for (let i = 0; i < health; i++) combinedName += "🩸";
-  combinedName += "</span>";
-  shipName.innerHTML = combinedName;
+  shipName.innerHTML = suggestLineBreak(name, "🩸".repeat(health));
   shipSize.innerHTML = "体积：" + width + "&times;" + height;
   let combinedAttack = "";
   if (cannon > 0) {
@@ -456,18 +524,28 @@ function displayShipInfo(
 }
 
 function updateGameBoard({ phase, board }) {
+  gameBoardDisplay.noGo = board.noGo;
   if (phase.type === "wait") {
-    gameBoardDisplay.displayMode = "none";
-    gameBoardDisplay.noGo = board.noGo;
-    drawGameBoard({ ...myShip, ...gameBoardDisplay });
+    drawGameBoard({ ...myShip, ...gameBoardDisplay, displayMode: "none" });
+  } else if (phase.type === "turn") {
+    drawGameBoard({ ...myShip, ...gameBoardDisplay, displayMode: "none" });
   }
 }
 
-function drawGameBoard({ width, height, noGo, displayMode }) {
+// displayMode: none, move, attack
+function drawGameBoard({
+  width,
+  height,
+  noGo,
+  gridDist,
+  displayMode,
+  distMax,
+}) {
   if (!width || !height || width < 0 || height < 0) {
     handleError("啊咧？船只尺寸不合法", false);
     return;
   }
+  gameBoardDisplay.prevDisplayMode = displayMode;
   for (let r = 1; r <= 8; r++)
     for (let c = 1; c <= 8; c++) {
       if (noGo.rows.includes(r) || noGo.cols.includes(c)) {
@@ -481,6 +559,14 @@ function drawGameBoard({ width, height, noGo, displayMode }) {
         } else if (displayMode === "none") {
           gameGrids[r][c].disabled = true;
           gameGrids[r][c].classList.add("normalColor");
+        } else if (displayMode === "attack") {
+          if (gridDist[r][c] > distMax) {
+            gameGrids[r][c].disabled = true;
+            gameGrids[r][c].classList.remove("normalColor");
+          } else {
+            gameGrids[r][c].disabled = false;
+            gameGrids[r][c].classList.remove("normalColor");
+          }
         }
       }
     }
@@ -496,6 +582,7 @@ function moveShip({ row, col }) {
       gameBoardDisplay.shipPos.push([r, c]);
       gameGrids[r][c].innerText = "🚢";
     }
+  calculateGridDist();
   toggleShipDirectionButton.disabled =
     myShip.width === myShip.height ||
     isGridDisabled(
@@ -507,6 +594,17 @@ function moveShip({ row, col }) {
     );
   myShip.row = row;
   myShip.col = col;
+}
+
+function calculateGridDist() {
+  for (let r = 1; r <= 8; r++)
+    for (let c = 1; c <= 8; c++) {
+      gameBoardDisplay.gridDist[r][c] = Math.min(
+        ...gameBoardDisplay.shipPos.map(
+          ([shipR, shipC]) => Math.max(Math.abs(shipR - r), Math.abs(shipC - c)) // allow diagonal movement
+        )
+      );
+    }
 }
 
 function isGridDisabled(row, col, width, height, noGo) {
@@ -605,12 +703,12 @@ function updateState({ startingIndex, moral, ship }) {
     gameShipCaption.innerHTML = shipSetting[ship.typeNum].name;
     gameHealth.innerHTML = "🩸".repeat(ship.health);
     gameMoral.innerHTML = moral;
-    gameSpeedCurr.innerHTML = ship.speed;
-    gameSpeedMax.innerHTML = shipSetting[ship.typeNum].speed;
+    gameSpeedCurr.innerHTML = ship.speed === Infinity ? "&infin;" : ship.speed;
+    gameSpeedMax.innerHTML = ship.speedMax;
     let rightRowCount = 0;
     if (shipSetting[ship.typeNum].cannon) {
       gameCannonCurr.innerHTML = ship.attack.cannon;
-      gameCannonMax.innerHTML = shipSetting[ship.typeNum].cannon;
+      gameCannonMax.innerHTML = ship.attackMax.cannon;
       gameCannonLine.style.display = "block";
       rightRowCount++;
     } else {
@@ -618,7 +716,7 @@ function updateState({ startingIndex, moral, ship }) {
     }
     if (shipSetting[ship.typeNum].torpedo) {
       gameTorpedoCurr.innerHTML = ship.attack.torpedo;
-      gameTorpedoMax.innerHTML = shipSetting[ship.typeNum].torpedo;
+      gameTorpedoMax.innerHTML = ship.attackMax.torpedo;
       gameTorpedoLine.style.display = "block";
       rightRowCount++;
     } else {
@@ -626,7 +724,7 @@ function updateState({ startingIndex, moral, ship }) {
     }
     if (shipSetting[ship.typeNum].aircraft) {
       gameAircraftCurr.innerHTML = ship.attack.aircraft;
-      gameAircraftMax.innerHTML = shipSetting[ship.typeNum].aircraft;
+      gameAircraftMax.innerHTML = ship.attackMax.aircraft;
       gameAircraftLine.style.display = "block";
       rightRowCount++;
     } else {
@@ -640,6 +738,220 @@ function updateState({ startingIndex, moral, ship }) {
     }
   }
 }
+
+function updateButtons({ type, isTurnOwner }) {
+  if (!currPlayer.ship.attackMax.cannon) {
+    cannonAttack.style.display = "none";
+  } else {
+    cannonAttack.style.display = "block";
+  }
+  if (!currPlayer.ship.attackMax.torpedo) {
+    torpedoAttack.style.display = "none";
+  } else {
+    torpedoAttack.style.display = "block";
+  }
+  if (!currPlayer.ship.attackMax.aircraft) {
+    aircraftAttack.style.display = "none";
+    aircraftDetect.style.display = "none";
+  } else {
+    aircraftAttack.style.display = "block";
+    aircraftDetect.style.display = "block";
+  }
+  enable(showLogButton, helpButton, myShipButton);
+  if (type === "wait") {
+    disableAllButtonsExcept(showLogButton, helpButton, myShipButton);
+    if (DEBUG)
+      enable(
+        attackDropdown,
+        cannonAttack,
+        torpedoAttack,
+        aircraftAttack,
+        aircraftDetect
+      );
+  } else if (type === "turn") {
+    if (isTurnOwner) {
+      enableAllButtonsExcept();
+      if (!currPlayer.ship.attack.cannon) disable(cannonAttack);
+      if (!currPlayer.ship.attack.torpedo) disable(torpedoAttack);
+      if (!currPlayer.ship.attack.aircraft)
+        disable(aircraftAttack, aircraftDetect);
+      if (currBoard.weather === "白雪" || currPlayer.dizzy) {
+        disable(attackDropdown);
+      }
+    }
+  }
+  // else if (type === "turn") {
+  //   if (isTurnOwner) {
+  //     attackButton.disabled =
+  //       moveButton.disabled =
+  //       shopButton.disabled =
+  //       skillButton.disabled =
+  //         false;
+  //   } else {
+  //     attackButton.disabled = moveButton.disabled = shopButton.disabled = true;
+  //     skillButton.disabled = false;
+  //   }
+  // }
+}
+
+function onShowLog() {
+  scrollInfoModalToBottom = true;
+  $("#infoModalBody").css("visibility", "hidden");
+  showInfoModal({ title: "通报记录", msg: gameLog });
+}
+
+let screenType = {};
+
+function enableAllButtonsExcept(...buttons) {
+  for (const b of allGameButtons) {
+    if (buttons && buttons.includes(b)) disable(b);
+    else enable(b);
+  }
+}
+
+function disableAllButtonsExcept(...buttons) {
+  for (const b of allGameButtons) {
+    if (buttons && buttons.includes(b)) enable(b);
+    else disable(b);
+  }
+}
+
+function enable(...buttons) {
+  for (const b of buttons) {
+    if (b.nodeName === "A") {
+      b.classList.remove("disabled");
+    } else {
+      b.disabled = false;
+    }
+  }
+}
+
+function disable(...buttons) {
+  for (const b of buttons) {
+    if (b.nodeName === "A") {
+      b.classList.add("disabled");
+    } else {
+      b.disabled = true;
+    }
+  }
+}
+
+function getHint({ mode, type }) {
+  if (mode === "attack") {
+    return `请选择${type}攻击目标`;
+  } else if (mode === "detect") {
+    return `请选择${type}攻击目标`;
+  }
+  return "";
+}
+
+function getAttackDist() {
+  console.log(screenType, screenType.type === "主炮");
+  if (screenType.type === "主炮") {
+    return currPlayer.ship.attackDist.cannon;
+  } else if (screenType.type === "鱼雷") {
+    return currPlayer.ship.attackDist.torpedo;
+  } else if (screenType.type === "飞机") {
+    return currPlayer.ship.attackDist.aircraft;
+  }
+  return -1;
+}
+
+function enterScreenMode(dropdownSelector, mode, type) {
+  disableAllButtonsExcept();
+  $(dropdownSelector).dropdown("toggle");
+  updateHint({ hint: getHint({ mode, type }) });
+  document.removeEventListener("click", captureAllClicks);
+  document.addEventListener("click", captureAllClicks);
+}
+
+function setScreenMode({ mode, type }) {
+  screenType = { mode, type };
+  if (mode === "attack") {
+    drawGameBoard({
+      ...myShip,
+      ...gameBoardDisplay,
+      displayMode: "attack",
+      distMax: getAttackDist(type),
+    });
+    enterScreenMode("#attackDropdown", mode, type);
+  } else if (mode === "detect") {
+    drawGameBoard({
+      ...myShip,
+      ...gameBoardDisplay,
+      displayMode: "attack",
+      distMax: getAttackDist(type),
+    });
+    enterScreenMode("#attackDropdown", mode, type);
+  } else if (mode === "reset") {
+    console.log("reset mode");
+    updateHint({ ...currPhase });
+    updateGameBoard({ phase: currPhase, board: currBoard });
+    updateButtons({ ...currPhase });
+  }
+}
+
+function captureAllClicks(event) {
+  if (event.target.classList.contains("gameGridButton")) {
+    if (screenType.mode === "attack") {
+      showConfirmModal({
+        title: "发起攻击",
+        msg: `确认要用${screenType.type}攻击[${toReadablePos(
+          event.target.id
+        )}]吗？`,
+        callback: () => {
+          console.log(`对${event.target.id}${screenType.mode}成功`);
+          setScreenMode({ mode: "reset" });
+        },
+        showAtBottom: true,
+      });
+    } else if (screenType.mode === "detect") {
+      let msg = suggestLineBreak(
+        `确认要用飞机侦察[${toReadablePos(event.target.id)}]吗？`,
+        currBoard.weather === "暴雨"
+          ? toTextInfo("注意：当前天气为暴雨，侦察后将无法使用飞机攻击")
+          : `（侦察后仍能攻击）`
+      );
+      showConfirmModal({
+        title: "进行侦察",
+        msg,
+        callback: () => {
+          console.log(`对${event.target.id}${screenType.mode}成功`);
+          setScreenMode({ mode: "reset" });
+        },
+        showAtBottom: true,
+      });
+    }
+  } else {
+    setScreenMode({ mode: "reset" });
+  }
+  document.removeEventListener("click", captureAllClicks);
+}
+
+function onAttackButton(event, type) {
+  event.stopPropagation();
+  event.target.classList.add("active");
+  setScreenMode({ mode: "attack", type });
+}
+
+function onDetectButton(event) {
+  event.stopPropagation();
+  event.target.classList.add("active");
+  setScreenMode({ mode: "detect", type: "飞机" });
+}
+
+function onMoveButton() {}
+
+function onShopButton() {}
+function onSkillButton() {}
+
+function inactivateAllDropdownItems() {
+  $(".dropdown-item").each((idx, elem) => {
+    elem.classList.remove("active");
+  });
+}
+
+$("#attackDropdownList").on("hide.bs.dropdown", inactivateAllDropdownItems);
 
 function updateProgressBar(duration) {
   $("#gameProgressBar").stop();
@@ -672,8 +984,7 @@ function displayChoosePosScreen() {
   closeAllExcept(choosePosScreen, true);
   choosePosFooter.before(gameBoard);
   gameBoard.style.marginTop = "-15px";
-  gameBoardDisplay.displayMode = "move";
-  drawGameBoard({ ...myShip, ...gameBoardDisplay });
+  drawGameBoard({ ...myShip, ...gameBoardDisplay, displayMode: "move" });
 }
 
 function displayChooseShipScreen() {
@@ -684,8 +995,18 @@ function displayGameScreen() {
   closeAllExcept(gameScreen, true);
   gameProgress.before(gameBoard);
   gameBoard.style.marginTop = "0px";
-  gameBoardDisplay.displayMode = "none";
-  drawGameBoard({ ...myShip, ...gameBoardDisplay });
+}
+
+function toReadablePos(id) {
+  const pos = id.split("-");
+  if (pos.length != 2) {
+    return "未知坐标";
+  }
+  return `${pos[0]}行${toLetter(parseInt(pos[1]))}列`;
+}
+
+function toLetter(num) {
+  return String.fromCharCode("A".charCodeAt(0) + num - 1);
 }
 
 // VH Resize functions
@@ -736,10 +1057,33 @@ $("#infoModal").on("hidden.bs.modal", (e) => {
     }
   }
 });
+$("#confirmModal").on("hidden.bs.modal", (e) => {
+  if (e.currentTarget.id === "confirmModal") {
+    if (screenType.mode && screenType.mode != "reset") {
+      setScreenMode({ mode: "reset" });
+    }
+    if (reoepnCallback) {
+      reoepnCallback();
+      reoepnCallback = null;
+    }
+  }
+});
+$("#infoModal").on("shown.bs.modal", () => {
+  if (scrollInfoModalToBottom) {
+    $("#infoModalBody").scrollTop($("#infoModalBody").height() + 50);
+    $("#infoModalBody").css("visibility", "visible");
+    scrollInfoModalToBottom = false;
+  }
+});
 function showInfoModal({ title, msg, duration }) {
   if ($("#infoModal").is(":visible")) {
     reoepnCallback = () => showInfoModal({ title, msg, duration });
     $("#infoModal").modal("hide");
+    return;
+  }
+  if ($("#confirmModal").is(":visible")) {
+    reoepnCallback = () => showInfoModal({ title, msg, duration });
+    $("#confirmModal").modal("hide");
     return;
   }
   $("#infoModalTitle").html(title);
@@ -764,8 +1108,8 @@ function showInfoModal({ title, msg, duration }) {
   $("#infoModal").modal("show");
 }
 
-function showConfirmModal({ title, msg, callback }) {
-  if (DEBUG) {
+function showConfirmModal({ title, msg, callback, showAtBottom }) {
+  if (DEBUG && !showAtBottom) {
     callback();
     return;
   }
@@ -779,5 +1123,12 @@ function showConfirmModal({ title, msg, callback }) {
   $("#confirmModalYesButton").on("click", () => {
     callback();
   });
+  if (showAtBottom) {
+    $("#confirmModalDialog").addClass("modalDialogEnd");
+    $(".modal-backdrop.show").css("opacity", "0.2");
+  } else {
+    $("#confirmModalDialog").removeClass("modalDialogEnd");
+    $(".modal-backdrop.show").css("opacity", "0.5");
+  }
   $("#confirmModal").modal({ backdrop: "static", keyboard: false });
 }

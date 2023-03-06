@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>海战大逃杀</title>
+    <title>植吧海战大逃杀</title>
     <link
       rel="shortcut icon"
       type="image/x-icon"
@@ -20,7 +20,7 @@
   <body>
     <div id="infoModal" class="modal fade" tabindex="-1" role="dialog">
       <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
+        <div id="infoModalContent" class="modal-content">
           <div class="modal-header">
             <h5 id="infoModalTitle" class="modal-title"></h5>
             <button type="button" class="close" data-dismiss="modal">
@@ -40,7 +40,11 @@
     </div>
 
     <div id="confirmModal" class="modal fade" tabindex="-1" role="dialog">
-      <div class="modal-dialog modal-dialog-centered" role="document">
+      <div
+        id="confirmModalDialog"
+        class="modal-dialog modal-dialog-centered"
+        role="document"
+      >
         <div class="modal-content">
           <div class="modal-header">
             <h5 id="confirmModalTitle" class="modal-title"></h5>
@@ -88,7 +92,7 @@
         >
           <h1 class="text-center">
             <span class="d-inline-block">欢迎来到</span
-            ><span class="d-inline-block">海战大逃杀</span>
+            ><span class="d-inline-block">植吧海战大逃杀</span>
           </h1>
           <div>当前游戏版本：alpha 1.1, 2022/3/3</div>
           <div class="form-group">
@@ -335,16 +339,12 @@
           <div class="d-flex flex-column justify-content-around subScreenDVH">
             <div id="gameRecord">
               <div class="d-flex flex-row justify-content-between">
-                <button class="btn btn-primary" id="showRecordButton">
-                  记录
-                </button>
+                <button class="btn btn-primary" id="showLogButton">记录</button>
                 <div
                   id="gameHint"
                   class="flex-grow hi text-center align-self-center"
                 ></div>
-                <button class="btn btn-primary" id="showChatButton">
-                  聊天
-                </button>
+                <button class="btn btn-primary" id="helpButton">帮助</button>
               </div>
             </div>
             <div id="gameBoard" class="d-flex flex-wrap flex-row">
@@ -576,7 +576,7 @@
                 <div class="shipTextMuted">
                   <span id="gamePlayerIndex"> </span><small>号位</small>
                 </div>
-                <img id="gameShipImg" />
+                <a id="myShipButton"><img id="gameShipImg" /></a>
                 <small id="gameShipCaption" class="shipTextMuted"></small>
               </div>
               <div
@@ -615,10 +615,25 @@
             </div>
             <div id="gameFooter">
               <div class="d-flex flex-row justify-content-between">
-                <button class="btn btn-primary" id="attackButton">攻击</button>
-                <button class="btn btn-primary" id="moveButton">移动</button>
-                <button class="btn btn-primary" id="buyButton">购买</button>
-                <button class="btn btn-primary" id="skillButton">特性</button>
+                <div id="attackDropdownList" class="dropdown">
+                  <button
+                    id="attackDropdown"
+                    class="btn btn-primary"
+                    type="button"
+                    data-toggle="dropdown"
+                  >
+                    攻击
+                  </button>
+                  <div class="dropdown-menu text-center text-white">
+                    <a id="cannonAttack" class="dropdown-item">主炮</a>
+                    <a id="torpedoAttack" class="dropdown-item">鱼雷</a>
+                    <a id="aircraftAttack" class="dropdown-item">飞机攻击</a>
+                    <a id="aircraftDetect" class="dropdown-item">飞机侦察</a>
+                  </div>
+                </div>
+                <button id="moveButton" class="btn btn-primary">移动</button>
+                <button id="shopButton" class="btn btn-primary">购买</button>
+                <button id="skillButton" class="btn btn-primary">特性</button>
               </div>
             </div>
           </div>

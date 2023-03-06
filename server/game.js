@@ -75,6 +75,13 @@ function makeObjectID(objects) {
   return objectID;
 }
 
+function makePhaseID(phases) {
+  let phaseID = makeID(12, false);
+  while (phases.filter((p) => p.phaseID === phaseID).length > 0)
+    phaseID = makeID(12, false);
+  return phaseID;
+}
+
 function linkShip(games, player, { shipNum, width, height, row, col }) {
   const game = games[player.roomID];
   const newShipID = makeObjectID(game.objects);
@@ -82,6 +89,7 @@ function linkShip(games, player, { shipNum, width, height, row, col }) {
     pid: player.pid,
     typeName: "boat",
     typeNum: shipNum,
+    shipName: SHIP_SETTING[shipNum].name,
     row,
     col,
     width,
@@ -91,7 +99,19 @@ function linkShip(games, player, { shipNum, width, height, row, col }) {
       torpedo: SHIP_SETTING[shipNum].torpedo,
       aircraft: SHIP_SETTING[shipNum].aircraft,
     },
+    attackMax: {
+      cannon: SHIP_SETTING[shipNum].cannon,
+      torpedo: SHIP_SETTING[shipNum].torpedo,
+      aircraft: SHIP_SETTING[shipNum].aircraft,
+    },
+    attackDist: {
+      cannon: Infinity,
+      torpedo: 1,
+      aircraft: Infinity,
+    },
+    aircraftDetectDist: Infinity,
     speed: SHIP_SETTING[shipNum].speed,
+    speedMax: SHIP_SETTING[shipNum].speed,
     health: SHIP_SETTING[shipNum].health,
     skills: SHIP_SETTING[shipNum].skills.map((s) => s.skillName),
   };
@@ -130,7 +150,9 @@ function initGame(players, playerList) {
       startingIndex: idx,
       nickname: players[pid].nickname,
       moral: 0, // 起始节操为0
+      items: {},
       shipID: null,
+      dizzy: false, // 眩晕状态
     })),
   };
 }
@@ -141,6 +163,7 @@ function startGame(game) {
   generateFish(game, GAME_START_FISH_NUM.min, GAME_START_FISH_NUM.max);
   initNewRound({ game, skipUpdateNoGo: true });
   game.phases.push({
+    phaseID: makePhaseID(game.phases),
     type: "wait", // wait, shop, turn
     startTime: Date.now(),
     duration: SHORT_WAIT_TIME,
@@ -148,17 +171,23 @@ function startGame(game) {
     hint: "第一轮开始",
     nextPhase: { intent: "inTurn", pid: game.players[0].pid },
     startGame: true,
+    items: {},
   });
 }
 
 function startInTurn(game, pid) {
   const playerIndex = game.players.findIndex((p) => p.pid === pid);
+  if (playerIndex < 0) return;
+  const player = game.players[playerIndex];
   const nickname = game.players[playerIndex].nickname;
   if (game.board.roundNum === 1 && playerIndex === 0) {
     initNotif({ game, title: `${nickname}的回合` });
     addNotif({ game, msg: `${playerIndex + 1}号玩家${nickname}的回合开始。` });
+    replenishAircraft(game, player);
   }
+  updateAttackAndSpeed(game);
   game.phases.push({
+    phaseID: makePhaseID(game.phases),
     type: "turn",
     turnOwner: { pid, nickname },
     startTime: Date.now(),
@@ -171,9 +200,21 @@ function startInTurn(game, pid) {
   });
 }
 
+function replenishAircraft(game, player) {
+  const ship = game.objects[player.shipID];
+  if (
+    ship &&
+    ship.attack.aircraft &&
+    ship.currAircraft < ship.attack.aircraft
+  ) {
+    ship.currAircraft++;
+  }
+}
+
 function initNewRound({ game, skipUpdateNoGo }) {
   if (!skipUpdateNoGo) updateNoGo(game);
   updateWeather(game);
+  updateAttackAndSpeed(game);
 }
 
 function updateWeather(game) {
@@ -183,6 +224,8 @@ function updateWeather(game) {
   } else {
     newWeather = weightedRandom(WEATHER, WEATHER_WEIGHT_NORMAL);
   }
+  // debug
+  newWeather = WEATHER[3];
   game.board.weather = newWeather.name;
   addNotif({
     game,
@@ -266,6 +309,61 @@ function generatePossibleNoGos(type, currNoGos) {
       { type, num: possibleNoGos[possibleNoGos.length - 1] },
     ];
   }
+}
+
+function updateAttackAndSpeed(game) {
+  for (let player of game.players) {
+    if (!player.shipID || !game.objects[player.shipID]) continue;
+    let ship = game.objects[player.shipID];
+    ship.attack.cannon = getCannonAtkNum(game, player, ship);
+    ship.attack.torpedo = getTorpedoAtkNum(game, player, ship);
+    ship.attack.cannon = getAircraftAtkNum(game, player, ship);
+    ship.speed = getSpeed(game, player, ship);
+  }
+}
+
+function getCannonAtkNum(game, player, ship) {
+  if (!ship.attackMax.cannon) return 0;
+  if (player.dizzy) return 0;
+  if (game.board.weather === "暴雨") return 1;
+  if (game.board.roundNum === 1) return 1;
+  let res = ship.attackMax.cannon;
+  if (game.board.weather === "满月") res++;
+  return res;
+}
+
+function getTorpedoAtkNum(game, player, ship) {
+  if (!ship.attackMax.torpedo) return 0;
+  if (player.dizzy) return 0;
+  let res = ship.attackMax.torpedo;
+  if (game.board.weather === "满月") res++;
+  return res;
+}
+
+function getAircraftAtkNum(game, player, ship) {
+  if (!ship.attackMax.aircraft) return 0;
+  if (player.dizzy) return 0;
+  if (game.board.weather === "暴雨") return 1;
+  return ship.attack.aircraft;
+}
+
+function getSpeed(game, player, ship) {
+  if (
+    game.board.weather === "冻结" &&
+    ship.shipName != "潜水艇" &&
+    ship.shipName != "破冰船" &&
+    ship.shipName != "幽灵船"
+  ) {
+    return 0;
+  }
+  if (game.board.weather === "满月") return Infinity;
+  let res = ship.speed;
+  if (game.board.weather === "暴雨") res--;
+  if (game.board.weather === "顺风") res++;
+  if (player.items["发动机"]) res += 2;
+  if (player.items["重型装甲"] && !player.items["重型装甲"].damaged) res -= 2;
+  res = Math.max(res, 0);
+  return res;
 }
 
 // Hide sensitive info

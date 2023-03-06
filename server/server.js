@@ -23,7 +23,6 @@ const {
   getPlayer,
 } = require("./game");
 const { MIN_PLAYER_NUM, MAX_PLAYER_NUM, SHIP_SETTING } = require("./constants");
-const SHIP_COUNT = SHIP_SETTING.length;
 
 // stage - "waiting", "chooseShip", "chosenShip", "inGame"
 
@@ -117,7 +116,7 @@ io.on("connection", (client) => {
       minPlayerNum: MIN_PLAYER_NUM,
       maxPlayerNum: MAX_PLAYER_NUM,
     });
-    console.log(`Room ${player.roomID} - ${cid} 进入等待室`);
+    gameLog(player.roomID, `${cid} 进入等待室`);
   }
 
   function handleEnterGame() {
@@ -146,7 +145,7 @@ io.on("connection", (client) => {
       roomID: player.roomID,
       SHIP_SETTING,
     });
-    console.log(`Room ${player.roomID} - ${cid} 开始游戏`);
+    gameLog(player.roomID, `${cid} 开始游戏`);
   }
 
   function handleDecideShip({ shipNum, width, height, row, col }) {
@@ -289,26 +288,36 @@ io.on("connection", (client) => {
       !games[roomID].phases ||
       !lastElem(games[roomID].phases).duration
     ) {
-      io.to(roomID).emit("error", "啊咧？找不到当前阶段", true);
+      io.to(roomID).emit("error", "啊咧？找不到当前阶段", false);
       return;
     }
-    const duration = lastElem(games[roomID].phases).duration;
-    console.log(`Room ${roomID} - 等待 ${duration} 秒`);
+    let phase = lastElem(games[roomID].phases);
+    const duration = phase.duration;
+    gameLog(roomID, `${phase.type} ${phase.hint} 开始，持续${duration}秒`);
     await new Promise((resolve) => setTimeout(resolve, duration * 1000));
     if (
       !games[roomID] ||
       !games[roomID].phases ||
       !lastElem(games[roomID].phases).nextPhase
     ) {
-      io.to(roomID).emit("error", "啊咧？找不到当前阶段", true);
+      io.to(roomID).emit("error", "啊咧？找不到当前阶段", false);
       return;
     }
-    const nextPhase = lastElem(games[roomID].phases).nextPhase;
+    if (lastElem(games[roomID].phases) != phase) {
+      gameLog(
+        roomID,
+        `异常出现新阶段：${lastElem(games[roomID].phases).type} ${
+          lastElem(games[roomID].phases).hint
+        }`
+      );
+      return;
+    }
+    const nextPhase = phase.nextPhase;
     if (nextPhase.intent === "inTurn") {
       startInTurn(games[roomID], nextPhase.pid);
       emitPhase(roomID);
     } else {
-      console.log(`Room ${roomID} - 没有下一阶段`);
+      gameLog(roomID, `${phase.type} ${phase.hint} 后没有下一阶段，游戏结束`);
       return;
     }
   }
@@ -327,17 +336,20 @@ io.on("connection", (client) => {
         return;
       }
       if (phase.done) {
-        console.log(`Room ${roomID} - 当前阶段已完成`);
+        gameLog(roomID, `当前阶段 ${phase.type} ${phase.hint} 已完成`);
         return;
       }
       const targetCID = toCID(pid);
       if (!targetCID || !sockets[targetCID]) {
-        console.log(`Room ${roomID} - 未能发送至 ${targetCID}`);
+        gameLog(roomID, `未能发送至 ${targetCID}`);
         return;
       }
       sockets[targetCID].emit("updateGame", { phase, board, player });
     }
-    console.log(`Room ${roomID} - 发送 ${lastElem(game.phases).type}`);
+    gameLog(
+      roomID,
+      `开始 ${lastElem(game.phases).type} ${lastElem(game.phases).hint}`
+    );
     game.phases[game.phases.length - 1].done = true;
     waitAndFire(roomID);
   }
@@ -351,4 +363,8 @@ function toPID(cid) {
 
 function toCID(pid) {
   return Object.keys(pidLookup).find((key) => pidLookup[key] === pid);
+}
+
+function gameLog(roomID, msg) {
+  console.log(`${new Date().toUTCString()} [${roomID}] ${msg}`);
 }

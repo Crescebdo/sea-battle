@@ -172,7 +172,7 @@ input {
 }
 
 #gameBoard {
-  width: calc(100vw - 10px);
+  width: calc(100vw - 12px);
   height: 100vw;
   margin-left: -15px;
   margin-right: -15px;
@@ -180,12 +180,12 @@ input {
 }
 
 .placeholderLabel {
-  width: 10px;
+  width: 12px;
   height: 20px;
 }
 
 .verticalLabel {
-  width: calc((100vw - 20px) / 8);
+  width: calc((100vw - 24px) / 8);
   height: 20px;
   display: flex;
   flex-direction: row;
@@ -194,7 +194,7 @@ input {
 }
 
 .horizontalLabel {
-  width: 10px;
+  width: 12px;
   height: calc(100vw / 17 * 2);
   display: flex;
   flex-direction: row;
@@ -204,8 +204,8 @@ input {
 }
 
 .gameGrid {
-  width: calc((100vw - 20px) / 8);
-  height: calc((100vw - 20px) / 8);
+  width: calc((100vw - 24px) / 8);
+  height: calc((100vw - 24px) / 8);
   padding: 1px;
 }
 
@@ -224,18 +224,21 @@ input {
 
 .gameGridButton:not(:disabled):not(.disabled):focus,
 .gameGridButton:not(:disabled):not(.disabled):hover,
+.gameGridButton:not(:disabled):not(.disabled).hover,
 .gameGridButton:not(:disabled):not(.disabled):active {
   background-color: #17a2b8 !important;
   border-color: aqua !important;
   border-width: 2px;
 }
 
-.noGo.gameGridButton:disabled {
+.noGo.gameGridButton:disabled,
+.noGo.gameGridButton.disabled {
   background-color: #909090;
   border-color: #909090;
 }
 
-.normalColor.gameGridButton:disabled:not(.noGo) {
+.normalColor.gameGridButton:disabled:not(.noGo),
+.normalColor.gameGridButton.disabled:not(.noGo) {
   opacity: 1;
 }
 
@@ -288,4 +291,43 @@ input {
   -o-transition: none !important;
   -ms-transition: none !important;
   transition: none !important;
+}
+
+.dropdown-menu {
+  background-color: #17a2b8;
+  min-width: 5rem;
+}
+
+.dropdown-item.disabled,
+.dropdown-item:disabled {
+  color: #bcbcbc;
+}
+
+.dropdown-item:focus,
+.dropdown-item:hover,
+.dropdown-item.active {
+  color: #ffffff;
+  text-decoration: none;
+  background-color: #138496;
+}
+
+.modalDialogEnd {
+  align-items: end !important;
+  padding-bottom: 15px;
+}
+
+.modal-backdrop.show {
+  opacity: 0.2;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+#infoModalContent {
+  max-height: 75vh;
+}
+
+#infoModalBody {
+  overflow-y: auto;
 }
