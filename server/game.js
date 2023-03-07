@@ -221,7 +221,7 @@ function updateWeather(game) {
     newWeather = weightedRandom(WEATHER, WEATHER_WEIGHT_NORMAL);
   }
   // debug
-  newWeather = WEATHER[1];
+  newWeather = WEATHER.filter((w) => w.name === "寒潮")[0];
   game.board.weather = newWeather.name;
   addNotif({
     game,
@@ -409,7 +409,7 @@ function updateNoGo(game) {
       ],
       [{}],
     ];
-    let noGoWeights = [0.8, 0.15, 50]; // 80% probability generate two no-go columns
+    let noGoWeights = [0.8, 0.15, 0.05]; // 80% probability generate two no-go columns
     for (let i = noGoPatterns.length - 2; i >= 0; --i) {
       for (let j = noGoPatterns[i].length - 1; j >= 0; --j) {
         if (conflictWithBoat(game, noGoPatterns[i][j])) {

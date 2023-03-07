@@ -287,14 +287,14 @@ const ITEM_SETTING = [
           { name: "浓雾", description: "攻击/侦察距离为1" },
           { name: "赤潮", description: "刷新2~3只杂鱼" },
           { name: "星夜", description: "所有人节操+50" },
-          { name: "冻结", description: "船只无法移动" },
+          { name: "冻结", description: "船只无法移动", cold: true },
           { name: "寒潮", description: "下轮天气为冰雹/冻结/白雪" },
         ],
       },
       {
         price: 150,
         list: [
-          { name: "冰雹", description: "本轮结束时，随机伤害船只" },
+          { name: "冰雹", description: "本轮结束时，随机伤害船只", cold: true },
           { name: "暴雨", description: "主炮/飞机最多各用1次，航速-1" },
         ],
       },
@@ -303,7 +303,7 @@ const ITEM_SETTING = [
         list: [
           { name: "雷雨", description: "主炮攻击范围为3×3" },
           { name: "晴天", description: "飞机攻击范围为一行/一列" },
-          { name: "白雪", description: "所有特性与物品效果无效" },
+          { name: "白雪", description: "所有特性与物品效果无效", cold: true },
         ],
       },
     ],
@@ -393,9 +393,9 @@ const WEATHER_WEIGHT_NORMAL = [
   1,
 ];
 const WEATHER_WEIGHT_COLD = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0];
-const SHORT_WAIT_TIME = 10; // in seconds
+const SHORT_WAIT_TIME = 10;
 const SHOP_TIME = 20;
-const TURN_TIME = 10;
+const TURN_TIME = 10; // debug, 60~90
 const INFO_TIME = 8;
 
 module.exports = {

@@ -231,7 +231,7 @@
             <div id="chooseShipHeader">
               <h1 id="chooseShipTitle" class="text-center text-white"></h1>
             </div>
-            <div class="d-flex flex-row w-100">
+            <div id="shipPanel" class="d-flex flex-row w-100">
               <div id="shipPanelLeft">
                 <div class="thumbnail ship">
                   <img
@@ -431,6 +431,7 @@
                 </div>
               </div>
             </div>
+            <div id="shopAnchor"></div>
           </div>
         </div>
 
@@ -734,7 +735,20 @@
                 </div>
                 <button id="moveButton" class="btn btn-primary">移动</button>
                 <button id="shopButton" class="btn btn-primary">购买</button>
-                <button id="skillButton" class="btn btn-primary">特性</button>
+                <!-- <button id="skillButton" class="btn btn-primary">特性</button> -->
+                <div id="skillDropdownList" class="dropdown">
+                  <button
+                    id="skillDropdown"
+                    class="btn btn-primary"
+                    type="button"
+                    data-toggle="dropdown"
+                  >
+                    特性
+                  </button>
+                  <div id="skillDropdownItems" class="dropdown-menu text-center text-white">
+                    <!-- <a id="cannonAttack" class="dropdown-item">主炮</a> -->
+                  </div>
+                </div>
               </div>
             </div>
           </div>

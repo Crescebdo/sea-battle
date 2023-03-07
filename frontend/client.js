@@ -31,7 +31,7 @@ let timerIntervalID;
 let shipSetting = [];
 let itemSetting = [];
 let myShip = {}; // shipNum, width, height, name, row, col
-let chosenItem, chosenPrice;
+let chosenItem, chosenPrice, showShopScreen;
 let extraItemInfo = {
   chosen: null,
   price: null,
@@ -145,6 +145,7 @@ for (let r = 1; r <= 8; r++) {
     gameGrids[r][c] = document.getElementById(`${r}-${c}`);
   }
 }
+const gameMyState = document.getElementById("gameMyState");
 const gameProgress = document.getElementById("gameProgress");
 const gamePlayerIndex = document.getElementById("gamePlayerIndex");
 const gameShipImg = document.getElementById("gameShipImg");
@@ -175,7 +176,7 @@ const myShipButton = document.getElementById("myShipButton");
 const attackDropdown = document.getElementById("attackDropdown");
 const moveButton = document.getElementById("moveButton");
 const shopButton = document.getElementById("shopButton");
-const skillButton = document.getElementById("skillButton");
+const skillDropdown = document.getElementById("skillDropdown");
 const showLogButton = document.getElementById("showLogButton");
 const helpButton = document.getElementById("helpButton");
 const cannonAttack = document.getElementById("cannonAttack");
@@ -185,7 +186,6 @@ const aircraftDetect = document.getElementById("aircraftDetect");
 showLogButton.addEventListener("click", onShowLog);
 moveButton.addEventListener("click", (e) => onMoveButton(e));
 shopButton.addEventListener("click", onShopButton);
-skillButton.addEventListener("click", onSkillButton);
 cannonAttack.addEventListener("click", (e) => onAttackButton(e, "主炮"));
 torpedoAttack.addEventListener("click", (e) => onAttackButton(e, "鱼雷"));
 aircraftAttack.addEventListener("click", (e) => onAttackButton(e, "飞机"));
@@ -208,7 +208,7 @@ const allGameButtons = [
   attackDropdown,
   moveButton,
   shopButton,
-  skillButton,
+  skillDropdown,
   cannonAttack,
   torpedoAttack,
   aircraftAttack,
@@ -358,11 +358,11 @@ function handleUpdateGame({ phase, board, player }) {
     (phase.startTime + phase.duration * 1000 - Date.now()) / 1000; // adjust duration
   console.log(phase);
 
-  [currPhase, currBoard, currPlayer] = [phase, board, player];
+  displayGameScreen();
   if (phase.startGame) {
-    displayGameScreen();
     startTimer();
   }
+  [currPhase, currBoard, currPlayer] = [phase, board, player];
   updateProgressBar(phase.duration);
   updateStatusBar({ ...board });
   updateHint({ ...phase });
@@ -609,6 +609,7 @@ function displayItemInfo(
         itemExtra.appendChild(title);
         const body = document.createElement("p");
         for (const item of singlePriceList.list) {
+          if (currBoard.weather === "寒潮" && !item.cold) continue;
           const button = document.createElement("button");
           button.setAttribute("extraItemName", item.name);
           button.setAttribute("extraItemPrice", singlePriceList.price);
@@ -905,7 +906,8 @@ function updateButtons({ type, isTurnOwner, weather, ship, moral, dizzy }) {
         aircraftAttack,
         aircraftDetect,
         moveButton,
-        shopButton
+        shopButton,
+        skillDropdown
       );
   } else if (type === "turn") {
     if (isTurnOwner) {
@@ -916,7 +918,7 @@ function updateButtons({ type, isTurnOwner, weather, ship, moral, dizzy }) {
       if (!ship.speed) disable(moveButton);
       if (!moral || weather === "白雪") disable(shopButton);
       if (dizzy) {
-        disable(attackDropdown, moveButton, shopButton, skillButton);
+        disable(attackDropdown, moveButton, shopButton, skillDropdown);
       }
     }
   }
@@ -1152,8 +1154,6 @@ function onShopButton() {
   displayShopScreen({ ...currPhase, ...currPlayer });
 }
 
-function onSkillButton() {}
-
 function updateProgressBar(duration) {
   $("#gameProgressBar").stop();
   $("#gameProgressBar").attr("style", "width: 0%");
@@ -1210,11 +1210,13 @@ function displayChooseShipScreen() {
   $("#decideShipTypeButton").prop("disabled", true);
   $("#decideShipTypeButton").unbind("click");
   $("#decideShipTypeButton").bind("click", decideShipType);
+  showShopScreen = false;
 }
 
 function displayShopScreen({ type, moral }) {
   if (type === "turn" || DEBUG) type = "inTurn";
   closeAllExcept(chooseShipScreen, true);
+  $("#shopAnchor").before(gameProgress);
   $("#chooseShipTitle").html("海战大逃杀商店");
   $("#shipPanelLeft .ship").hide();
   $("#shipPanelLeft .item." + type).show();
@@ -1228,6 +1230,8 @@ function displayShopScreen({ type, moral }) {
   $("#decideShipTypeButton").prop("disabled", true);
   $("#decideShipTypeButton").unbind("click");
   $("#decideShipTypeButton").bind("click", decideItemType);
+  $("#cancelShopButton").unbind("click");
+  $("#cancelShopButton").bind("click", () => displayGameScreen());
   extraItemInfo = {
     chosen: null,
     price: null,
@@ -1235,11 +1239,13 @@ function displayShopScreen({ type, moral }) {
     prevScroll: 0,
     needInit: true,
   };
-  newShopScreen = true;
+  showShopScreen = true;
+  refreshVH();
 }
 
 function displayGameScreen() {
   closeAllExcept(gameScreen, true);
+  gameMyState.before(gameProgress);
   gameProgress.before(gameBoard);
   gameBoard.style.marginTop = "0px";
 }
@@ -1361,12 +1367,18 @@ function refreshVH() {
     // only needed for mobile screen
     return;
   }
+  gameProgress.style.height = window.innerHeight / 100;
+  gameProgress.style.marginTop = window.innerHeight / 100;
   mainContents.style.height = window.innerHeight + "px";
   const headerHeight = statusBar.offsetHeight;
+  const footerHeight =
+    $("#chooseShipScreen").is(":visible") && showShopScreen
+      ? (window.innerHeight / 100) * 2
+      : 0;
   shipPanelLeft.style.height =
-    window.innerHeight - 15 - headerHeight - 15 - 56 + "px";
+    window.innerHeight - 15 - headerHeight - 15 - 56 - footerHeight + "px";
   shipPanelRight.style.height =
-    window.innerHeight - 15 - headerHeight - 15 - 56 + "px";
+    window.innerHeight - 15 - headerHeight - 15 - 56 - footerHeight + "px";
   for (const subScreen of subScreenDVH) {
     subScreen.style.height = window.innerHeight - 15 - headerHeight - 15 + "px";
   }
