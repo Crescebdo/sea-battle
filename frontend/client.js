@@ -16,6 +16,10 @@ socket.on("shipSetting", (SHIP_SETTING, shipNum) => {
   shipSetting = SHIP_SETTING;
   displayShipInfo(shipNum, shipSetting.shipNum);
 });
+socket.on("itemSetting", (ITEM_SETTING, itemNum) => {
+  itemSetting = ITEM_SETTING;
+  displayItemInfo(itemNum, itemSetting.itemNum);
+});
 socket.on("chooseShip", handleChooseShip);
 socket.on("chosenShip", handleChosenShip); // still need to wait
 socket.on("updateGame", handleUpdateGame);
@@ -25,7 +29,16 @@ const playerCountChinese = ["", "单", "双", "三", "四", "五", "六", "七",
 let timerStart;
 let timerIntervalID;
 let shipSetting = [];
+let itemSetting = [];
 let myShip = {}; // shipNum, width, height, name, row, col
+let chosenItem, chosenPrice;
+let extraItemInfo = {
+  chosen: null,
+  price: null,
+  prevScreen: false,
+  prevScroll: 0,
+  needInit: true,
+};
 let gameBoardDisplay = {
   prevDisplayMode: "",
   noGo: { rows: [], cols: [] },
@@ -97,7 +110,13 @@ const shipNote = document.getElementById("shipNote");
 const shipQuote = document.getElementById("shipQuote");
 const shipInfo = document.getElementById("shipInfo");
 const decideShipTypeButton = document.getElementById("decideShipTypeButton");
-decideShipTypeButton.addEventListener("click", decideShipType);
+const itemInfo = document.getElementById("itemInfo");
+const itemNewMoral = document.getElementById("itemNewMoral");
+const itemName = document.getElementById("itemName");
+const itemPrice = document.getElementById("itemPrice");
+const itemDescription = document.getElementById("itemDescription");
+const itemExtra = document.getElementById("itemExtra");
+const itemFootnote = document.getElementById("itemFootnote");
 
 // choose ship position screen
 const choosePosScreen = document.getElementById("choosePosScreen");
@@ -164,7 +183,7 @@ const torpedoAttack = document.getElementById("torpedoAttack");
 const aircraftAttack = document.getElementById("aircraftAttack");
 const aircraftDetect = document.getElementById("aircraftDetect");
 showLogButton.addEventListener("click", onShowLog);
-moveButton.addEventListener("click", onMoveButton);
+moveButton.addEventListener("click", (e) => onMoveButton(e));
 shopButton.addEventListener("click", onShopButton);
 skillButton.addEventListener("click", onSkillButton);
 cannonAttack.addEventListener("click", (e) => onAttackButton(e, "主炮"));
@@ -301,8 +320,14 @@ function handleEnterWaitingRoom({
   }
 }
 
-function handleChooseShip({ totalPlayerCount, roomID, SHIP_SETTING }) {
+function handleChooseShip({
+  totalPlayerCount,
+  roomID,
+  SHIP_SETTING,
+  ITEM_SETTING,
+}) {
   shipSetting = SHIP_SETTING;
+  itemSetting = ITEM_SETTING;
   displayChooseShipScreen();
   updateStatusBar({ totalPlayerCount, roomID });
 }
@@ -383,13 +408,21 @@ function enterGame() {
 }
 
 /* eslint-disable */
-const showShipInfo = (shipNum) => {
+function showShipInfo(shipNum) {
   if (shipSetting[shipNum]) {
     displayShipInfo(shipNum, shipSetting[shipNum]);
   } else {
     socket.emit("getShipSetting", shipNum);
   }
-};
+}
+
+function showItemInfo(itemNum) {
+  if (itemSetting[itemNum]) {
+    displayItemInfo(itemNum, itemSetting[itemNum]);
+  } else {
+    socket.emit("getItemSetting", itemNum);
+  }
+}
 /* eslint-enable */
 
 function decideShipType() {
@@ -411,6 +444,19 @@ function decideShipType() {
       choosePosShipName.innerHTML = myShip.name;
       choosePosShipSize.innerHTML = `${myShip.width}&times;${myShip.height}`;
       displayChoosePosScreen();
+    },
+  });
+}
+
+function decideItemType() {
+  showConfirmModal({
+    msg:
+      `确认要购买${itemSetting[chosenItem].name}吗？` +
+      linebreak() +
+      `节操：${currPlayer.moral}→${currPlayer.moral - chosenPrice}`,
+    callback: () => {
+      console.log("购买：" + chosenItem);
+      displayGameScreen();
     },
   });
 }
@@ -481,8 +527,10 @@ function displayShipInfo(
     quote,
   }
 ) {
+  $("#shipInfo").show();
   shipInfo.scrollTop = 0;
   myShip.shipNum = shipNum;
+
   shipName.innerHTML = suggestLineBreak(name, "🩸".repeat(health));
   shipSize.innerHTML = "体积：" + width + "&times;" + height;
   let combinedAttack = "";
@@ -531,6 +579,88 @@ function displayShipInfo(
   decideShipTypeButton.disabled = false;
 }
 
+// debug
+function displayItemInfo(
+  itemNum,
+  { name, price, description, type, multiplePriceList }
+) {
+  $("#itemInfo").show();
+  if (extraItemInfo.prevScreen) {
+    extraItemInfo.prevScroll = itemInfo.scrollTop;
+    console.log(extraItemInfo);
+  }
+  chosenItem = itemNum;
+
+  itemName.innerHTML = name;
+  itemPrice.innerHTML = price;
+  itemDescription.innerHTML = description;
+  if (!multiplePriceList) {
+    extraItemInfo.prevScreen = false;
+    chosenPrice = price;
+    itemExtra.style.display = "none";
+  } else {
+    extraItemInfo.prevScreen = true;
+    if (extraItemInfo.needInit) {
+      extraItemInfo.needInit = false;
+      $("#itemExtra").empty();
+      for (const singlePriceList of multiplePriceList) {
+        const title = document.createElement("h3");
+        title.innerHTML = "节操" + singlePriceList.price;
+        itemExtra.appendChild(title);
+        const body = document.createElement("p");
+        for (const item of singlePriceList.list) {
+          const button = document.createElement("button");
+          button.setAttribute("extraItemName", item.name);
+          button.setAttribute("extraItemPrice", singlePriceList.price);
+          button.classList.add("btn", "btn-primary", "extraItemButton");
+          //if (singlePriceList.price > currPlayer.moral) button.disabled = true; //debug
+          button.textContent = item.name;
+          body.appendChild(button);
+          const caption = document.createElement("span");
+          caption.classList.add("shipTextMuted", "sm");
+          caption.innerHTML = item.description;
+          body.appendChild(caption);
+          body.innerHTML += linebreak();
+        }
+        itemExtra.appendChild(body);
+      }
+      $(".extraItemButton").bind("click", (event) => {
+        $(".extraItemButton").removeClass("hover");
+        event.target.classList.add("hover");
+        extraItemInfo.item = event.target.getAttribute("extraItemName");
+        extraItemInfo.price = event.target.getAttribute("extraItemPrice");
+        itemNewMoral.innerHTML = "→" + (currPlayer.moral - extraItemInfo.price);
+        decideShipTypeButton.disabled = false;
+      });
+    }
+    itemExtra.style.display = "block";
+  }
+  if (type === "equip") {
+    itemFootnote.style.display = "block";
+  } else {
+    itemFootnote.style.display = "none";
+  }
+  if (!multiplePriceList) {
+    itemNewMoral.innerHTML = "→" + (currPlayer.moral - chosenPrice);
+    decideShipTypeButton.disabled = false;
+  } else {
+    if (extraItemInfo.item) {
+      itemNewMoral.innerHTML = "→" + (currPlayer.moral - extraItemInfo.price);
+      decideShipTypeButton.disabled = false;
+    } else {
+      itemNewMoral.innerHTML = "";
+      decideShipTypeButton.disabled = true;
+    }
+  }
+
+  if (multiplePriceList && extraItemInfo.prevScroll) {
+    console.log(extraItemInfo.prevScroll);
+    itemInfo.scrollTop = extraItemInfo.prevScroll;
+  } else {
+    itemInfo.scrollTop = 0;
+  }
+}
+
 function updateGameBoard({ phase, board }) {
   gameBoardDisplay.noGo = board.noGo;
   if (phase.type === "wait") {
@@ -563,8 +693,22 @@ function drawGameBoard({
       } else {
         gameGrids[r][c].classList.remove("noGo");
         if (displayMode === "move") {
-          gameGrids[r][c].disabled = isGridDisabled(r, c, width, height, noGo);
-          gameGrids[r][c].classList.remove("normalColor");
+          if (
+            isNaN(distMax) ||
+            getManhattanDist(r, c, myShip.row, myShip.col) <= distMax
+          ) {
+            gameGrids[r][c].disabled = isGridDisabled(
+              r,
+              c,
+              width,
+              height,
+              noGo
+            );
+            gameGrids[r][c].classList.remove("normalColor");
+          } else {
+            gameGrids[r][c].disabled = true;
+            gameGrids[r][c].classList.remove("normalColor");
+          }
         } else if (displayMode === "none") {
           gameGrids[r][c].disabled = true;
           gameGrids[r][c].classList.add("normalColor");
@@ -614,6 +758,10 @@ function calculateGridDist() {
         )
       );
     }
+}
+
+function getManhattanDist(r1, c1, r2, c2) {
+  return Math.abs(r1 - r2) + Math.abs(c1 - c2);
 }
 
 function isGridDisabled(row, col, width, height, noGo) {
@@ -728,7 +876,7 @@ function updateState({ startingIndex, moral, ship }) {
   }
 }
 
-function updateButtons({ type, isTurnOwner, weather, ship, dizzy }) {
+function updateButtons({ type, isTurnOwner, weather, ship, moral, dizzy }) {
   if (!ship.attackMax.cannon) {
     cannonAttack.style.display = "none";
   } else {
@@ -755,7 +903,9 @@ function updateButtons({ type, isTurnOwner, weather, ship, dizzy }) {
         cannonAttack,
         torpedoAttack,
         aircraftAttack,
-        aircraftDetect
+        aircraftDetect,
+        moveButton,
+        shopButton
       );
   } else if (type === "turn") {
     if (isTurnOwner) {
@@ -763,8 +913,10 @@ function updateButtons({ type, isTurnOwner, weather, ship, dizzy }) {
       if (!ship.attack.cannon) disable(cannonAttack);
       if (!ship.attack.torpedo) disable(torpedoAttack);
       if (!ship.attack.aircraft) disable(aircraftAttack, aircraftDetect);
-      if (weather === "白雪" || dizzy) {
-        disable(attackDropdown);
+      if (!ship.speed) disable(moveButton);
+      if (!moral || weather === "白雪") disable(shopButton);
+      if (dizzy) {
+        disable(attackDropdown, moveButton, shopButton, skillButton);
       }
     }
   }
@@ -780,6 +932,8 @@ function getHint({ mode, type }) {
     return `请选择${type}攻击目标`;
   } else if (mode === "detect") {
     return `请选择${type}攻击目标`;
+  } else if (mode === "move") {
+    return `请选择移动目标`;
   }
   return "";
 }
@@ -795,6 +949,10 @@ function getAttackDist() {
   return -1;
 }
 
+function getMoveDist() {
+  return currPlayer.ship.speed;
+}
+
 function needHighlightWeather({ mode, type }) {
   if (mode === "attack") {
     if (type === "主炮")
@@ -804,6 +962,14 @@ function needHighlightWeather({ mode, type }) {
       return ["浓雾", "晴天", "暴雨", "满月"].includes(currBoard.weather);
   } else if (mode === "detect") {
     return ["浓雾", "暴雨"].includes(currBoard.weather);
+  } else if (mode === "move") {
+    if (["暴雨", "顺风", "满月"].includes(currBoard.weather)) return true;
+    return (
+      currBoard.weather === "冻结" &&
+      currPlayer.ship.shipName != "潜水艇" &&
+      currPlayer.ship.shipName != "破冰船" &&
+      currPlayer.ship.shipName != "幽灵船"
+    );
   }
 }
 
@@ -878,6 +1044,16 @@ function setScreenMode({ mode, type }) {
     highlight(gameAircraftDetCurr);
     if (needHighlightWeather({ mode, type })) highlight(statusWeather);
     enterScreenMode(mode, type);
+  } else if (mode === "move") {
+    drawGameBoard({
+      ...myShip,
+      ...gameBoardDisplay,
+      displayMode: "move",
+      distMax: getMoveDist(),
+    });
+    highlight(gameSpeedCurr);
+    if (needHighlightWeather({ mode, type })) highlight(statusWeather);
+    enterScreenMode(mode, type);
   } else if (mode === "reset") {
     console.log("reset mode");
     updateStatusBar({ ...currBoard });
@@ -917,6 +1093,16 @@ function captureAllClicks(event) {
         },
         showAtBottom: true,
       });
+    } else if (screenType.mode === "move") {
+      showConfirmModal({
+        title: "进行移动",
+        msg: getMoveMessage({ id: event.target.id }),
+        callback: () => {
+          console.log(`对${event.target.id}${screenType.mode}成功`);
+          setScreenMode({ mode: "reset" });
+        },
+        showAtBottom: true,
+      });
     }
   } else {
     setScreenMode({ mode: "reset" });
@@ -933,6 +1119,18 @@ function getAttackMessage({ type, id }) {
   }
 }
 
+function getMoveMessage({ id }) {
+  const ship = currPlayer.ship;
+  console.log(ship.row, ship.col, myShip.row, myShip.col);
+  return (
+    `确认要移动到[${toReadablePos(id)}]吗？` +
+    linebreak() +
+    `航速：${ship.speed}→${
+      ship.speed - getManhattanDist(ship.row, ship.col, myShip.row, myShip.col)
+    }`
+  );
+}
+
 function onAttackButton(event, type) {
   event.stopPropagation();
   event.target.classList.add("active");
@@ -945,9 +1143,15 @@ function onDetectButton(event) {
   setScreenMode({ mode: "detect", type: "飞机" });
 }
 
-function onMoveButton() {}
+function onMoveButton(event) {
+  event.stopPropagation();
+  setScreenMode({ mode: "move" });
+}
 
-function onShopButton() {}
+function onShopButton() {
+  displayShopScreen({ ...currPhase, ...currPlayer });
+}
+
 function onSkillButton() {}
 
 function updateProgressBar(duration) {
@@ -995,6 +1199,43 @@ function displayChoosePosScreen() {
 
 function displayChooseShipScreen() {
   closeAllExcept(chooseShipScreen, true);
+  $("#chooseShipTitle").html("请选择你的船只");
+  $("#shipPanelLeft .ship").show();
+  $("#shipPanelLeft .item").hide();
+  $("#shipPanelLeft").scrollTop(0);
+  $("#cancelShopButton").hide();
+  $("#shipInfo").hide();
+  $("#itemInfo").hide();
+  $("#itemMoralLine").hide();
+  $("#decideShipTypeButton").prop("disabled", true);
+  $("#decideShipTypeButton").unbind("click");
+  $("#decideShipTypeButton").bind("click", decideShipType);
+}
+
+function displayShopScreen({ type, moral }) {
+  if (type === "turn" || DEBUG) type = "inTurn";
+  closeAllExcept(chooseShipScreen, true);
+  $("#chooseShipTitle").html("海战大逃杀商店");
+  $("#shipPanelLeft .ship").hide();
+  $("#shipPanelLeft .item." + type).show();
+  $("#shipPanelLeft").scrollTop(0);
+  $("#cancelShopButton").show();
+  $("#shipInfo").hide();
+  $("#itemInfo").hide();
+  $("#itemMoralLine").show();
+  $("#itemCurrMoral").html(moral);
+  $("#itemNewMoral").html("");
+  $("#decideShipTypeButton").prop("disabled", true);
+  $("#decideShipTypeButton").unbind("click");
+  $("#decideShipTypeButton").bind("click", decideItemType);
+  extraItemInfo = {
+    chosen: null,
+    price: null,
+    prevScreen: false,
+    prevScroll: 0,
+    needInit: true,
+  };
+  newShopScreen = true;
 }
 
 function displayGameScreen() {

@@ -1,15 +1,3 @@
-module.exports = {
-  validateShipDecision,
-  makeRoomID,
-  linkShip,
-  initGame,
-  startGame,
-  lastElem,
-  startInTurn,
-  getPhase,
-  getPlayer,
-};
-
 const {
   SHIP_SETTING,
   MAX_NOGO_NUM,
@@ -158,6 +146,7 @@ function initGame(players, playerList) {
       nickname: players[pid].nickname,
       moral: 0, // 起始节操为0
       items: {},
+      actualItems: {},
       shipID: null,
       dizzy: false, // 眩晕状态
     })),
@@ -166,7 +155,7 @@ function initGame(players, playerList) {
 
 function startGame(game) {
   initNotif({ game, title: "第一轮开始" });
-  updateNoGo(game);
+  updateNoGo(game); //debug
   generateFish(game, GAME_START_FISH_NUM.min, GAME_START_FISH_NUM.max);
   initNewRound({ game, skipUpdateNoGo: true });
   game.phases.push({
@@ -253,68 +242,6 @@ function updateInstantWeatherEffect(game, weather) {
     for (let o of Object.values(game.objects)) {
       if (o.typeName === "boat") o.health += 1;
     }
-  }
-}
-
-function updateNoGo(game) {
-  const currNoGoNum = game.board.noGo.rows.length + game.board.noGo.cols.length;
-  if (currNoGoNum >= MAX_NOGO_NUM) {
-    return;
-  }
-  let possibleNoGos = [
-    ...generatePossibleNoGos("row", game.board.noGo.rows),
-    ...generatePossibleNoGos("col", game.board.noGo.cols),
-  ];
-  possibleNoGos = possibleNoGos.filter((e) => {
-    if (e.type === "row") {
-      return (
-        Object.values(game.objects).filter(
-          (o) =>
-            o.typeName === "boat" && o.row <= e.num && e.num <= o.row + o.height
-        ).length === 0
-      );
-    } else {
-      return (
-        Object.values(game.objects).filter(
-          (o) =>
-            o.typeName === "boat" && o.col <= e.num && e.num <= o.col + o.width
-        ).length === 0
-      );
-    }
-  });
-  possibleNoGos = shuffleArray(possibleNoGos).slice(0, 2);
-  possibleNoGos.sort((a, b) => {
-    a.type < b.type || (a.type === b.type && a.num > b.num) ? 1 : -1;
-  });
-  let notifStr = "";
-  for (const noGo of possibleNoGos) {
-    if (noGo.type === "row") {
-      notifStr += (notifStr.length === 0 ? "" : "、") + `第${noGo.num}行`;
-      game.board.noGo.rows.push(noGo.num);
-    } else if (noGo.type === "col") {
-      notifStr +=
-        (notifStr.length === 0 ? "" : "、") + `第${toLetter(noGo.num)}列`;
-      game.board.noGo.cols.push(noGo.num);
-    }
-  }
-  if (notifStr.length > 0) {
-    addNotif({ game, title: "禁区", msg: notifStr + "已被设为禁区。" });
-  }
-}
-
-function generatePossibleNoGos(type, currNoGos) {
-  let possibleNoGos = Array.from(Array(9).keys())
-    .slice(1)
-    .filter((e) => !currNoGos.includes(e));
-  if (possibleNoGos.length === 0) {
-    return [];
-  } else if (possibleNoGos.length === 1) {
-    return [{ type, num: possibleNoGos[0] }];
-  } else {
-    return [
-      { type, num: possibleNoGos[0] },
-      { type, num: possibleNoGos[possibleNoGos.length - 1] },
-    ];
   }
 }
 
@@ -425,6 +352,7 @@ function getPlayer(game, pid) {
   player.ship.pid = undefined;
   player.ship.actualAircraftNum = undefined;
   player.pid = undefined;
+  player.actualItems = undefined;
   return player;
 }
 
@@ -456,6 +384,94 @@ function initNotif({ game, title }) {
   game.notif.log += `<h4>${title}</h4>`;
 }
 
+function updateNoGo(game) {
+  const currNoGoNum = game.board.noGo.rows.length + game.board.noGo.cols.length;
+  let notifStr = "";
+  if (currNoGoNum < MAX_NOGO_NUM) {
+    const [rowMin, rowMax] = getMinMaxExclude(1, 8, game.board.noGo.rows);
+    const [colMin, colMax] = getMinMaxExclude(1, 8, game.board.noGo.cols);
+    let noGoPatterns = [
+      [
+        { row: [rowMin, rowMin + 1] },
+        { row: [rowMax - 1, rowMax] },
+        { col: [colMin, colMin + 1] },
+        { col: [colMax - 1, colMax] },
+        { row: [rowMin, rowMin], col: [colMin, colMin] },
+        { row: [rowMin, rowMin], col: [colMax, colMax] },
+        { row: [rowMax, rowMax], col: [colMin, colMin] },
+        { row: [rowMax, rowMax], col: [colMax, colMax] },
+      ],
+      [
+        { row: [rowMin, rowMin] },
+        { row: [rowMax, rowMax] },
+        { col: [colMin, colMin] },
+        { col: [colMax, colMax] },
+      ],
+      [{}],
+    ];
+    let noGoWeights = [0.8, 0.15, 50]; // 80% probability generate two no-go columns
+    for (let i = noGoPatterns.length - 2; i >= 0; --i) {
+      for (let j = noGoPatterns[i].length - 1; j >= 0; --j) {
+        if (conflictWithBoat(game, noGoPatterns[i][j])) {
+          noGoPatterns[i].splice(j, 1);
+        }
+      }
+      if (noGoPatterns[i].length === 0) {
+        noGoPatterns.splice(i, 1);
+        noGoWeights.splice(i, 1);
+      }
+    }
+    const newNoGoPattern = weightedRandom(noGoPatterns, noGoWeights);
+    const newNoGo = weightedRandom(
+      newNoGoPattern,
+      Array(newNoGoPattern.length).fill(1)
+    );
+
+    const { row, col } = newNoGo;
+    if (row) {
+      for (let r = row[0]; r <= row[1]; ++r) {
+        notifStr += (notifStr.length === 0 ? "" : "、") + `第${r}行`;
+        game.board.noGo.rows.push(r);
+      }
+    }
+    if (col) {
+      for (let c = col[0]; c <= col[1]; ++c) {
+        notifStr += (notifStr.length === 0 ? "" : "、") + `第${toLetter(c)}列`;
+        game.board.noGo.cols.push(c);
+      }
+    }
+  }
+  if (notifStr.length > 0) {
+    addNotif({ game, title: "禁区", msg: notifStr + "已被设为禁区。" });
+  } else {
+    addNotif({ game, title: "禁区", msg: "本轮没有新禁区。" });
+  }
+}
+
+function conflictWithBoat(game, { row, col }) {
+  if (row) {
+    if (
+      Object.values(game.objects).filter(
+        (o) =>
+          o.typeName === "boat" &&
+          intersect(o.row, o.row + o.height - 1, row[0], row[1])
+      ).length > 0
+    )
+      return true;
+  }
+  if (col) {
+    if (
+      Object.values(game.objects).filter(
+        (o) =>
+          o.typeName === "boat" &&
+          intersect(o.col, o.col + o.width - 1, col[0], col[1])
+      ).length > 0
+    )
+      return true;
+  }
+  return false;
+}
+
 // utils
 
 function getRandomInt(min, max) {
@@ -467,6 +483,7 @@ function shuffleArray(array) {
 }
 
 function weightedRandom(items, weights) {
+  if (items.length === 0) return null;
   const cumulativeWeights = [];
   for (let i = 0; i < weights.length; i += 1) {
     cumulativeWeights[i] = weights[i] + (cumulativeWeights[i - 1] || 0);
@@ -487,3 +504,42 @@ function toLetter(num) {
 function lastElem(arr) {
   return arr[arr.length - 1];
 }
+
+function intersect(lo1, hi1, lo2, hi2) {
+  if (hi1 < lo2) return false;
+  if (hi2 < lo1) return false;
+  return true;
+}
+
+function getMinMaxExclude(start, end, exclude) {
+  let min, max;
+  for (let i = start; i <= end; ++i) {
+    if (exclude.includes(i)) continue;
+    min = i;
+    break;
+  }
+  for (let i = end; i >= start; --i) {
+    if (exclude.includes(i)) continue;
+    max = i;
+    break;
+  }
+  return [min, max];
+}
+
+/* eslint-disable */
+function log(obj) {
+  console.log(JSON.stringify(obj, null, 4));
+}
+/* eslint-enable */
+
+module.exports = {
+  validateShipDecision,
+  makeRoomID,
+  linkShip,
+  initGame,
+  startGame,
+  lastElem,
+  startInTurn,
+  getPhase,
+  getPlayer,
+};

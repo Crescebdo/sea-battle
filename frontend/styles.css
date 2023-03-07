@@ -71,26 +71,31 @@ input {
   color: white;
 }
 
-#shipInfo {
+#shipInfo,
+#itemInfo {
   overflow-y: auto;
+}
+
+#itemInfo {
+  flex-grow: 1;
 }
 
 .shipConfirm {
   padding-top: 15px;
 }
 
-.shipImg {
+.thumbnail {
   flex-basis: 33.33%;
   min-width: 0;
   padding: 7.5px 15px 7.5px 5px;
 }
 
-.shipImg img {
+.thumbnail img {
   transition: box-shadow 0.15s ease-in-out;
   width: 100%;
 }
 
-.shipImg img:hover {
+.thumbnail img:hover {
   cursor: pointer;
   box-shadow: 0 0 5px 5px #0ff;
 }
@@ -107,7 +112,8 @@ input {
 
 /* global */
 
-.btn:not(:disabled):not(.disabled):hover {
+.btn:not(:disabled):not(.disabled):hover,
+.btn:not(:disabled):not(.disabled).hover {
   box-shadow: 0 0 3px 3px #0ff;
 }
 
@@ -149,7 +155,7 @@ input {
     width: 50%;
     height: calc(100vh - 15px - 56px - 15px);
   }
-  .shipImg {
+  .thumbnail {
     flex-basis: 100%;
   }
   .btn {
@@ -340,4 +346,17 @@ a:hover {
 
 #infoModalBody {
   overflow-y: auto;
+}
+
+.extraItemButton {
+  font-size: 1rem;
+  padding: 0.15rem 0.5rem 0.2rem 0.5rem;
+  margin-bottom: 0.25rem;
+  margin-top: 0.2rem;
+  margin-right: 0.3rem;
+  margin-left: 0.2rem;
+}
+
+.sm {
+  font-size: 90%;
 }

@@ -223,6 +223,104 @@ const SHIP_SETTING = [
     quote: "“航空母舰这下牛逼了，增加了轰炸机和侦察机。”——HK",
   },
 ];
+const ITEM_SETTING = [
+  {
+    name: "发动机",
+    price: 200,
+    description: "航速+2。<br/>购买后，执行一个移动额外回合。",
+    type: "equip",
+  },
+  {
+    name: "黄瓜",
+    price: 200,
+    description: "击毁其它船只后，回复1血。<br/>购买后，执行一个攻击额外回合。",
+    type: "equip",
+  },
+  {
+    name: "雷达",
+    price: 200,
+    description: `<span class="hi">每回合限一次</span>，可获知距离1内其它船只的总数。`,
+    type: "equip",
+  },
+  {
+    name: "声呐",
+    price: 100,
+    description: `<span class="hi">每回合限一次</span>，可获知距离1内其它潜水艇的总数，以及距离1内所有杂鱼的坐标。`,
+    type: "equip",
+  },
+  {
+    name: "守护符",
+    price: 200,
+    description: "抵挡雷雨弹与辣椒弹。<br/>每回合最多受1点伤害。",
+    type: "equip",
+  },
+  {
+    name: "重型装甲",
+    price: 150,
+    description:
+      "航速-2。<br/>被攻击后，抵挡1点伤害，然后重型装甲损坏，失去一切效果。",
+    type: "equip",
+  },
+  {
+    name: "鱼叉",
+    price: 50,
+    description: "购买后，击毁距离2内的所有杂鱼。",
+    type: "prop",
+  },
+  {
+    name: "照明弹",
+    price: 50,
+    description: `<span class="hi">已使用主炮后不可购买。每回合限购一次</span>，照明任意3x3区域内船只种类，然后本回合无法不可主炮。`,
+    type: "prop",
+  },
+  {
+    name: "空气弹",
+    price: "100~200",
+    description:
+      '<span class="hi">白雪、极光、满月天气下不可购买</span>。购买后，更改当前的天气。',
+    type: "prop",
+    multiplePriceList: [
+      {
+        price: 100,
+        list: [
+          { name: "顺风", description: "航速+1" },
+          { name: "浓雾", description: "攻击/侦察距离为1" },
+          { name: "赤潮", description: "刷新2~3只杂鱼" },
+          { name: "星夜", description: "所有人节操+50" },
+          { name: "冻结", description: "船只无法移动" },
+          { name: "寒潮", description: "下轮天气为冰雹/冻结/白雪" },
+        ],
+      },
+      {
+        price: 150,
+        list: [
+          { name: "冰雹", description: "本轮结束时，随机伤害船只" },
+          { name: "暴雨", description: "主炮/飞机最多各用1次，航速-1" },
+        ],
+      },
+      {
+        price: 200,
+        list: [
+          { name: "雷雨", description: "主炮攻击范围为3×3" },
+          { name: "晴天", description: "飞机攻击范围为一行/一列" },
+          { name: "白雪", description: "所有特性与物品效果无效" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "雷雨弹",
+    price: 100,
+    description: "购买后，本回合下一次攻击范围改为3×3，并且禁用“暴击”。",
+    type: "prop",
+  },
+  {
+    name: "辣椒弹",
+    price: 50,
+    description: "购买后，本回合下一次攻击范围改为一列或一行，并且禁用“暴击”。",
+    type: "prop",
+  },
+];
 const WEATHER = [
   {
     name: "浓雾",
@@ -276,7 +374,7 @@ const WEATHER = [
   {
     name: "满月",
     description:
-      "所有船只航速无限。所有船只增加1次攻击和特性发动次数。所有攻击方式伤害+1。所有船只回复1血。",
+      "所有船只航速无限。所有船只增加1次攻击与特性发动次数。所有攻击方式伤害+1。所有船只回复1血。",
   },
 ];
 const WEATHER_WEIGHT_NORMAL = [
@@ -306,6 +404,7 @@ module.exports = {
   MAX_NOGO_NUM,
   GAME_START_FISH_NUM,
   SHIP_SETTING,
+  ITEM_SETTING,
   WEATHER,
   WEATHER_WEIGHT_NORMAL,
   WEATHER_WEIGHT_COLD,

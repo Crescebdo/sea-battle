@@ -22,7 +22,12 @@ const {
   getPhase,
   getPlayer,
 } = require("./game");
-const { MIN_PLAYER_NUM, MAX_PLAYER_NUM, SHIP_SETTING } = require("./constants");
+const {
+  MIN_PLAYER_NUM,
+  MAX_PLAYER_NUM,
+  SHIP_SETTING,
+  ITEM_SETTING,
+} = require("./constants");
 
 // stage - "waiting", "chooseShip", "chosenShip", "inGame"
 
@@ -41,6 +46,9 @@ io.on("connection", (client) => {
   client.on("getShipSetting", (shipNum) =>
     client.emit("shipSetting", SHIP_SETTING, shipNum)
   );
+  client.on("getItemSetting", (itemNum) => {
+    client.emit("itemSetting", ITEM_SETTING, itemNum);
+  });
   client.on("decideShip", handleDecideShip);
   client.on("chosenGhost", handleChosenGhost);
 
@@ -144,6 +152,7 @@ io.on("connection", (client) => {
       totalPlayerCount: rooms[player.roomID].length,
       roomID: player.roomID,
       SHIP_SETTING,
+      ITEM_SETTING,
     });
     gameLog(player.roomID, `${cid} 开始游戏`);
   }

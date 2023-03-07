@@ -229,78 +229,155 @@
         <div id="chooseShipScreen" class="screenUnderStatusBar">
           <div class="d-flex flex-column justify-content-around subScreenDVH">
             <div id="chooseShipHeader">
-              <h1 class="text-center text-white">请选择你的船只</h1>
+              <h1 id="chooseShipTitle" class="text-center text-white"></h1>
             </div>
             <div class="d-flex flex-row w-100">
               <div id="shipPanelLeft">
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/草船.jpg"
                     alt="草船"
                     onClick="showShipInfo(0)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/潜水艇.jpg"
                     alt="潜水艇"
                     onClick="showShipInfo(1)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/回收舰.jpg"
                     alt="回收舰"
                     onClick="showShipInfo(2)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/水雷舰.jpg"
                     alt="水雷舰"
                     onClick="showShipInfo(3)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/菊花箭船.jpg"
                     alt="菊花箭船"
                     onClick="showShipInfo(4)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/破冰船.jpg"
                     alt="破冰船"
                     onClick="showShipInfo(5)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/幽灵船.jpg"
                     alt="幽灵船"
                     onClick="showShipInfo(6)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/炮船.jpg"
                     alt="炮船"
                     onClick="showShipInfo(7)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/轻型航母.jpg"
                     alt="轻型航母"
                     onClick="showShipInfo(8)"
                   />
                 </div>
-                <div class="shipImg">
+                <div class="thumbnail ship">
                   <img
                     src="asset/images/ships/冰航母.jpg"
                     alt="冰航母"
                     onClick="showShipInfo(9)"
+                  />
+                </div>
+                <div class="thumbnail item roundShop turnShop inTurn">
+                  <img
+                    src="asset/images/items/照明弹.jpg"
+                    alt="照明弹"
+                    onClick="showItemInfo(7)"
+                  />
+                </div>
+                <div class="thumbnail item roundShop turnShop">
+                  <img
+                    src="asset/images/items/发动机.jpg"
+                    alt="发动机"
+                    onClick="showItemInfo(0)"
+                  />
+                </div>
+                <div class="thumbnail item roundShop turnShop">
+                  <img
+                    src="asset/images/items/黄瓜.jpg"
+                    alt="黄瓜"
+                    onClick="showItemInfo(1)"
+                  />
+                </div>
+                <div class="thumbnail item roundShop turnShop">
+                  <img
+                    src="asset/images/items/雷达.jpg"
+                    alt="雷达"
+                    onClick="showItemInfo(2)"
+                  />
+                </div>
+                <div class="thumbnail item roundShop turnShop">
+                  <img
+                    src="asset/images/items/声呐.jpg"
+                    alt="声呐"
+                    onClick="showItemInfo(3)"
+                  />
+                </div>
+                <div class="thumbnail item roundShop turnShop">
+                  <img
+                    src="asset/images/items/守护符.jpg"
+                    alt="守护符"
+                    onClick="showItemInfo(4)"
+                  />
+                </div>
+                <div class="thumbnail item roundShop turnShop">
+                  <img
+                    src="asset/images/items/重型装甲.jpg"
+                    alt="重型装甲"
+                    onClick="showItemInfo(5)"
+                  />
+                </div>
+                <div class="thumbnail item inTurn">
+                  <img
+                    src="asset/images/items/鱼叉.jpg"
+                    alt="鱼叉"
+                    onClick="showItemInfo(6)"
+                  />
+                </div>
+                <div class="thumbnail item inTurn">
+                  <img
+                    src="asset/images/items/空气弹.jpg"
+                    alt="空气弹"
+                    onClick="showItemInfo(8)"
+                  />
+                </div>
+                <div class="thumbnail item inTurn">
+                  <img
+                    src="asset/images/items/雷雨弹.jpg"
+                    alt="雷雨弹"
+                    onClick="showItemInfo(9)"
+                  />
+                </div>
+                <div class="thumbnail item inTurn">
+                  <img
+                    src="asset/images/items/辣椒弹.jpg"
+                    alt="辣椒弹"
+                    onClick="showItemInfo(10)"
                   />
                 </div>
               </div>
@@ -311,9 +388,15 @@
                 <div class="align-self-end shipConfirm">
                   <button
                     type="button"
+                    class="btn btn-secondary"
+                    id="cancelShopButton"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
                     class="btn btn-primary"
                     id="decideShipTypeButton"
-                    disabled
                   >
                     确定
                   </button>
@@ -329,6 +412,22 @@
                   <div id="shipPassive"></div>
                   <small><p id="shipNote" class="shipTextMuted"></p></small>
                   <p id="shipQuote" class="shipTextMuted text-right"></p>
+                </div>
+                <div id="itemInfo">
+                  <h2 id="itemName"></h2>
+                  <p>价格：<span id="itemPrice" class="lt"></span></p>
+                  <h3>效果</h3>
+                  <p id="itemDescription"></p>
+                  <p id="itemExtra"></p>
+                  <p id="itemFootnote" class="hi text-right">
+                    该物品为持续性装备，只能购买一次。
+                  </p>
+                </div>
+                <div id="itemMoralLine" class="text-right">
+                  <p>
+                    节操：<span id="itemCurrMoral"></span
+                    ><span id="itemNewMoral" class="lt"></span>
+                  </p>
                 </div>
               </div>
             </div>
