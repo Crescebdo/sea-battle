@@ -109,6 +109,13 @@ function linkShip(games, player, { shipNum, width, height, row, col }) {
       torpedo: 1,
       aircraft: Infinity,
     },
+    attackArea: {
+      cannon: "normal", // normal, rowcol, 3by3
+      torpedo: "normal",
+      aircraft: "normal",
+    },
+    actualAircraftNum: SHIP_SETTING[shipNum].aircraft,
+    aircraftDetect: SHIP_SETTING[shipNum].aircraft,
     aircraftDetectDist: Infinity,
     speed: SHIP_SETTING[shipNum].speed,
     speedMax: SHIP_SETTING[shipNum].speed,
@@ -204,10 +211,10 @@ function replenishAircraft(game, player) {
   const ship = game.objects[player.shipID];
   if (
     ship &&
-    ship.attack.aircraft &&
-    ship.currAircraft < ship.attack.aircraft
+    ship.attackMax.aircraft &&
+    ship.actualAircraftNum < ship.attackMax.aircraft
   ) {
-    ship.currAircraft++;
+    ship.actualAircraftNum++;
   }
 }
 
@@ -225,7 +232,7 @@ function updateWeather(game) {
     newWeather = weightedRandom(WEATHER, WEATHER_WEIGHT_NORMAL);
   }
   // debug
-  newWeather = WEATHER[3];
+  newWeather = WEATHER[1];
   game.board.weather = newWeather.name;
   addNotif({
     game,
@@ -317,7 +324,11 @@ function updateAttackAndSpeed(game) {
     let ship = game.objects[player.shipID];
     ship.attack.cannon = getCannonAtkNum(game, player, ship);
     ship.attack.torpedo = getTorpedoAtkNum(game, player, ship);
-    ship.attack.cannon = getAircraftAtkNum(game, player, ship);
+    ship.attack.aircraft = getAircraftAtkNum(game, player, ship);
+    ship.aircraftDetect = ship.attack.aircraft;
+    ship.attackDist = getAttackDist(game);
+    ship.attackArea = getAttackArea(game, player);
+    ship.aircraftDetectDist = getAircraftDetectDist(game);
     ship.speed = getSpeed(game, player, ship);
   }
 }
@@ -344,7 +355,7 @@ function getAircraftAtkNum(game, player, ship) {
   if (!ship.attackMax.aircraft) return 0;
   if (player.dizzy) return 0;
   if (game.board.weather === "暴雨") return 1;
-  return ship.attack.aircraft;
+  return ship.actualAircraftNum;
 }
 
 function getSpeed(game, player, ship) {
@@ -357,13 +368,38 @@ function getSpeed(game, player, ship) {
     return 0;
   }
   if (game.board.weather === "满月") return Infinity;
-  let res = ship.speed;
+  let res = ship.speedMax;
   if (game.board.weather === "暴雨") res--;
   if (game.board.weather === "顺风") res++;
   if (player.items["发动机"]) res += 2;
   if (player.items["重型装甲"] && !player.items["重型装甲"].damaged) res -= 2;
   res = Math.max(res, 0);
   return res;
+}
+
+function getAttackDist(game) {
+  return {
+    cannon: game.board.weather === "浓雾" ? 1 : Infinity,
+    torpedo: 1,
+    aircraft: game.board.weather === "浓雾" ? 1 : Infinity,
+  };
+}
+
+function getAttackArea(game, player) {
+  if (player.items["雷雨弹"]) {
+    return { cannon: "3by3", torpedo: "3by3", aircraft: "3by3" };
+  } else if (player.items["辣椒弹"]) {
+    return { cannon: "rowcol", torpedo: "rowcol", aircraft: "rowcol" };
+  }
+  let cannon, torpedo, aircraft;
+  cannon = torpedo = aircraft = "normal";
+  if (game.board.weather === "雷雨") cannon = "3by3";
+  if (game.board.weather === "晴天") aircraft = "rowcol";
+  return { cannon, torpedo, aircraft };
+}
+
+function getAircraftDetectDist(game) {
+  return game.board.weather === "浓雾" ? 1 : Infinity;
 }
 
 // Hide sensitive info
@@ -384,9 +420,10 @@ function getPlayer(game, pid) {
   if (index < 0) return;
   let player = game.players[index];
   if (!player.shipID || !game.objects[player.shipID]) return;
-  player = { ...player, ship: game.objects[player.shipID] };
+  player = { ...player, ship: { ...game.objects[player.shipID] } };
   player.shipID = undefined;
   player.ship.pid = undefined;
+  player.ship.actualAircraftNum = undefined;
   player.pid = undefined;
   return player;
 }

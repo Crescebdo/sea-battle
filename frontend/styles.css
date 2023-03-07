@@ -257,7 +257,14 @@ input {
 }
 
 #gameHint {
-  max-width: 50%;
+  max-width: 50vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 1.15rem;
 }
 
 #gameProgress {
@@ -280,9 +287,12 @@ input {
 }
 
 #gameStateLeft,
-#gameStateMid,
-#gameStateRight {
+#gameStateMid {
   flex: 1;
+}
+
+.justifyContentEvenly {
+  justify-content: space-evenly;
 }
 
 .notransition {

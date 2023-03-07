@@ -140,10 +140,12 @@ const gameCannonMax = document.getElementById("gameCannonMax");
 const gameTorpedoLine = document.getElementById("gameTorpedoLine");
 const gameTorpedoCurr = document.getElementById("gameTorpedoCurr");
 const gameTorpedoMax = document.getElementById("gameTorpedoMax");
-const gameAircraftLine = document.getElementById("gameAircraftLine");
-const gameAircraftCurr = document.getElementById("gameAircraftCurr");
-const gameAircraftMax = document.getElementById("gameAircraftMax");
-const gameStateMidDummy = document.getElementById("gameStateMidDummy");
+const gameAircraftAtkLine = document.getElementById("gameAircraftAtkLine");
+const gameAircraftAtkCurr = document.getElementById("gameAircraftAtkCurr");
+const gameAircraftAtkMax = document.getElementById("gameAircraftAtkMax");
+const gameAircraftDetLine = document.getElementById("gameAircraftDetLine");
+const gameAircraftDetCurr = document.getElementById("gameAircraftDetCurr");
+const gameAircraftDetMax = document.getElementById("gameAircraftDetMax");
 for (let r = 1; r <= 8; r++) {
   for (let c = 1; c <= 8; c++) {
     gameGrids[r][c].addEventListener("click", () => clickGameGrid(r, c));
@@ -341,7 +343,7 @@ function handleUpdateGame({ phase, board, player }) {
   updateHint({ ...phase });
   updateGameBoard({ phase, board });
   updateState({ ...player });
-  updateButtons({ ...phase });
+  updateButtons({ ...phase, ...board, ...player });
   if (phase.modal) {
     showInfoModal({ ...phase.modal });
     gameLog += phase.modal.msg;
@@ -417,7 +419,24 @@ function clickGameGrid(row, col) {
   if (gameBoardDisplay.prevDisplayMode === "move") {
     moveShip({ row, col });
     decidePosButton.disabled = false;
+  } else if (gameBoardDisplay.prevDisplayMode === "attack") {
+    if (attackMode === "row") {
+      addHover({ ...currBoard }, row, row, 1, 8);
+    } else if (attackMode === "col") {
+      addHover({ ...currBoard }, 1, 8, col, col);
+    } else if (fallbackAttackMode === "3by3") {
+      addHover({ ...currBoard }, row, row + 2, col, col + 2);
+    }
   }
+}
+
+function addHover({ noGo }, rowStart, rowEnd, colStart, colEnd) {
+  for (let r = rowStart; r <= rowEnd; r++)
+    for (let c = colStart; c <= colEnd; c++) {
+      if (r < 1 || r > 8 || c < 1 || c > 8) continue;
+      if (noGo.rows.includes(r) || noGo.cols.includes(c)) continue;
+      gameGrids[r][c].classList.add("hover");
+    }
 }
 
 function toggleShipDirection() {
@@ -429,7 +448,7 @@ function toggleShipDirection() {
 
 function decideShipPosition() {
   showConfirmModal({
-    msg: `确认要将船放在此位置吗？${linebreak}<small>${suggestLineBreak(
+    msg: `确认要将船放在此位置吗？${linebreak()}<small>${suggestLineBreak(
       "方向（横向/竖向）确定后，",
       "在游戏过程中将无法再更改"
     )}</small>`,
@@ -437,24 +456,13 @@ function decideShipPosition() {
   });
 }
 
-// helper functions
-
-// take in multiple strings, suggest line break in between
-function suggestLineBreak(...strs) {
-  let res = "";
-  for (const str of strs) {
-    res += `<span class="d-inline-block">${str}</span>`;
-  }
-  return res;
+function onShowLog() {
+  scrollInfoModalToBottom = true;
+  $("#infoModalBody").css("visibility", "hidden");
+  showInfoModal({ title: "通报记录", msg: gameLog });
 }
 
-function toTextInfo(str) {
-  return `<span class="text-info">${str}</span>`;
-}
-
-function linebreak() {
-  return "<br/>";
-}
+// display functions
 
 function displayShipInfo(
   shipNum,
@@ -548,6 +556,7 @@ function drawGameBoard({
   gameBoardDisplay.prevDisplayMode = displayMode;
   for (let r = 1; r <= 8; r++)
     for (let c = 1; c <= 8; c++) {
+      gameGrids[r][c].classList.remove("hover");
       if (noGo.rows.includes(r) || noGo.cols.includes(c)) {
         gameGrids[r][c].disabled = true;
         gameGrids[r][c].classList.add("noGo");
@@ -626,30 +635,8 @@ function updateHint({ hint }) {
   if (hint) gameHint.innerHTML = hint;
 }
 
-if (!DEBUG) {
-  window.addEventListener("beforeunload", (event) => {
-    event.returnValue = "你确定要离开吗？";
-  });
-}
-
-// Hide loading when done
-
-window.onload = function () {
-  displayInitialScreen();
-};
-
-// display functions
-
-function closeAllExcept(activeScreen, hasStatusBar) {
-  for (const screen of allScreens.filter((s) => s.id != activeScreen.id)) {
-    screen.style.display = "none";
-  }
-  screenWithStatusBar.style.display = hasStatusBar ? "block" : "none";
-  activeScreen.style.display = "block";
-  if (!hasStatusBar) hideTimer();
-}
-
 function updateStatusBar({ roundNum, weather, totalPlayerCount, roomID }) {
+  unhighlight(statusWeather);
   let doRefreshVH = false;
   if (roundNum && weather) {
     statusRoundNumLine.style.visibility = "visible";
@@ -697,6 +684,14 @@ function updateState({ startingIndex, moral, ship }) {
     gamePlayerIndex.innerHTML = startingIndex + 1;
   }
   if (ship) {
+    unhighlight(
+      gameMoral,
+      gameSpeedCurr,
+      gameCannonCurr,
+      gameTorpedoCurr,
+      gameAircraftAtkCurr,
+      gameAircraftDetCurr
+    );
     gameShipImg.src = `asset/images/ships/${
       shipSetting[ship.typeNum].name
     }.jpg`;
@@ -705,12 +700,10 @@ function updateState({ startingIndex, moral, ship }) {
     gameMoral.innerHTML = moral;
     gameSpeedCurr.innerHTML = ship.speed === Infinity ? "&infin;" : ship.speed;
     gameSpeedMax.innerHTML = ship.speedMax;
-    let rightRowCount = 0;
     if (shipSetting[ship.typeNum].cannon) {
       gameCannonCurr.innerHTML = ship.attack.cannon;
       gameCannonMax.innerHTML = ship.attackMax.cannon;
       gameCannonLine.style.display = "block";
-      rightRowCount++;
     } else {
       gameCannonLine.style.display = "none";
     }
@@ -718,39 +711,35 @@ function updateState({ startingIndex, moral, ship }) {
       gameTorpedoCurr.innerHTML = ship.attack.torpedo;
       gameTorpedoMax.innerHTML = ship.attackMax.torpedo;
       gameTorpedoLine.style.display = "block";
-      rightRowCount++;
     } else {
       gameTorpedoLine.style.display = "none";
     }
     if (shipSetting[ship.typeNum].aircraft) {
-      gameAircraftCurr.innerHTML = ship.attack.aircraft;
-      gameAircraftMax.innerHTML = ship.attackMax.aircraft;
-      gameAircraftLine.style.display = "block";
-      rightRowCount++;
+      gameAircraftAtkCurr.innerHTML = ship.attack.aircraft;
+      gameAircraftAtkMax.innerHTML = ship.attackMax.aircraft;
+      gameAircraftAtkLine.style.display = "block";
+      gameAircraftDetCurr.innerHTML = ship.aircraftDetect;
+      gameAircraftDetMax.innerHTML = ship.attackMax.aircraft;
+      gameAircraftDetLine.style.display = "block";
     } else {
-      gameAircraftLine.style.display = "none";
-    }
-    if (rightRowCount === 3) {
-      gameStateMidDummy.style.visibility = "hidden";
-      gameStateMidDummy.style.display = "block";
-    } else {
-      gameStateMidDummy.style.display = "none";
+      gameAircraftAtkLine.style.display = "none";
+      gameAircraftDetLine.style.display = "none";
     }
   }
 }
 
-function updateButtons({ type, isTurnOwner }) {
-  if (!currPlayer.ship.attackMax.cannon) {
+function updateButtons({ type, isTurnOwner, weather, ship, dizzy }) {
+  if (!ship.attackMax.cannon) {
     cannonAttack.style.display = "none";
   } else {
     cannonAttack.style.display = "block";
   }
-  if (!currPlayer.ship.attackMax.torpedo) {
+  if (!ship.attackMax.torpedo) {
     torpedoAttack.style.display = "none";
   } else {
     torpedoAttack.style.display = "block";
   }
-  if (!currPlayer.ship.attackMax.aircraft) {
+  if (!ship.attackMax.aircraft) {
     aircraftAttack.style.display = "none";
     aircraftDetect.style.display = "none";
   } else {
@@ -771,70 +760,20 @@ function updateButtons({ type, isTurnOwner }) {
   } else if (type === "turn") {
     if (isTurnOwner) {
       enableAllButtonsExcept();
-      if (!currPlayer.ship.attack.cannon) disable(cannonAttack);
-      if (!currPlayer.ship.attack.torpedo) disable(torpedoAttack);
-      if (!currPlayer.ship.attack.aircraft)
-        disable(aircraftAttack, aircraftDetect);
-      if (currBoard.weather === "白雪" || currPlayer.dizzy) {
+      if (!ship.attack.cannon) disable(cannonAttack);
+      if (!ship.attack.torpedo) disable(torpedoAttack);
+      if (!ship.attack.aircraft) disable(aircraftAttack, aircraftDetect);
+      if (weather === "白雪" || dizzy) {
         disable(attackDropdown);
       }
     }
   }
-  // else if (type === "turn") {
-  //   if (isTurnOwner) {
-  //     attackButton.disabled =
-  //       moveButton.disabled =
-  //       shopButton.disabled =
-  //       skillButton.disabled =
-  //         false;
-  //   } else {
-  //     attackButton.disabled = moveButton.disabled = shopButton.disabled = true;
-  //     skillButton.disabled = false;
-  //   }
-  // }
 }
 
-function onShowLog() {
-  scrollInfoModalToBottom = true;
-  $("#infoModalBody").css("visibility", "hidden");
-  showInfoModal({ title: "通报记录", msg: gameLog });
-}
+// switch screen mode
 
 let screenType = {};
-
-function enableAllButtonsExcept(...buttons) {
-  for (const b of allGameButtons) {
-    if (buttons && buttons.includes(b)) disable(b);
-    else enable(b);
-  }
-}
-
-function disableAllButtonsExcept(...buttons) {
-  for (const b of allGameButtons) {
-    if (buttons && buttons.includes(b)) enable(b);
-    else disable(b);
-  }
-}
-
-function enable(...buttons) {
-  for (const b of buttons) {
-    if (b.nodeName === "A") {
-      b.classList.remove("disabled");
-    } else {
-      b.disabled = false;
-    }
-  }
-}
-
-function disable(...buttons) {
-  for (const b of buttons) {
-    if (b.nodeName === "A") {
-      b.classList.add("disabled");
-    } else {
-      b.disabled = true;
-    }
-  }
-}
+$(document).on("hide.bs.dropdown", inactivateAllDropdownItems);
 
 function getHint({ mode, type }) {
   if (mode === "attack") {
@@ -846,7 +785,6 @@ function getHint({ mode, type }) {
 }
 
 function getAttackDist() {
-  console.log(screenType, screenType.type === "主炮");
   if (screenType.type === "主炮") {
     return currPlayer.ship.attackDist.cannon;
   } else if (screenType.type === "鱼雷") {
@@ -857,24 +795,79 @@ function getAttackDist() {
   return -1;
 }
 
-function enterScreenMode(dropdownSelector, mode, type) {
+function needHighlightWeather({ mode, type }) {
+  if (mode === "attack") {
+    if (type === "主炮")
+      return ["浓雾", "雷雨", "暴雨", "满月"].includes(currBoard.weather);
+    else if (type === "鱼雷") return ["满月"].includes(currBoard.weather);
+    else if (type === "飞机")
+      return ["浓雾", "晴天", "暴雨", "满月"].includes(currBoard.weather);
+  } else if (mode === "detect") {
+    return ["浓雾", "暴雨"].includes(currBoard.weather);
+  }
+}
+
+function enterScreenMode(mode, type) {
   disableAllButtonsExcept();
-  $(dropdownSelector).dropdown("toggle");
   updateHint({ hint: getHint({ mode, type }) });
   document.removeEventListener("click", captureAllClicks);
   document.addEventListener("click", captureAllClicks);
 }
 
+let attackMode = null;
+let fallbackAttackMode = null;
+
+function needToChooseRowCol(type, attackArea) {
+  if (attackMode) return false;
+  return (
+    (type === "主炮" && attackArea.cannon === "rowcol") ||
+    (type === "鱼雷" && attackArea.torpedo === "rowcol") ||
+    (type === "飞机" && attackArea.aircraft === "rowcol")
+  );
+}
+
 function setScreenMode({ mode, type }) {
   screenType = { mode, type };
   if (mode === "attack") {
+    disableAllButtonsExcept();
+    if (needToChooseRowCol(type, currPlayer.ship.attackArea)) {
+      document.removeEventListener("click", captureAllClicks);
+      showConfirmModal({
+        title: "选择攻击范围",
+        msg: "请选择攻击范围（一行或一列）",
+        callback: () => {
+          attackMode = "col";
+          setScreenMode({ mode, type });
+        },
+        showAtBottom: true,
+        leftButtonText: "行",
+        rightButtonText: "列",
+        leftCallback: () => {
+          attackMode = "row";
+          setScreenMode({ mode, type });
+        },
+        triggerCallbackAfterHidden: true,
+      });
+      return;
+    }
     drawGameBoard({
       ...myShip,
       ...gameBoardDisplay,
       displayMode: "attack",
       distMax: getAttackDist(type),
     });
-    enterScreenMode("#attackDropdown", mode, type);
+    if (type === "主炮") {
+      highlight(gameCannonCurr);
+      fallbackAttackMode = currPlayer.ship.attackArea.cannon;
+    } else if (type === "鱼雷") {
+      highlight(gameTorpedoCurr);
+      fallbackAttackMode = currPlayer.ship.attackArea.torpedo;
+    } else if (type === "飞机") {
+      highlight(gameAircraftAtkCurr);
+      fallbackAttackMode = currPlayer.ship.attackArea.aircraft;
+    }
+    if (needHighlightWeather({ mode, type })) highlight(statusWeather);
+    enterScreenMode(mode, type);
   } else if (mode === "detect") {
     drawGameBoard({
       ...myShip,
@@ -882,12 +875,17 @@ function setScreenMode({ mode, type }) {
       displayMode: "attack",
       distMax: getAttackDist(type),
     });
-    enterScreenMode("#attackDropdown", mode, type);
+    highlight(gameAircraftDetCurr);
+    if (needHighlightWeather({ mode, type })) highlight(statusWeather);
+    enterScreenMode(mode, type);
   } else if (mode === "reset") {
     console.log("reset mode");
+    updateStatusBar({ ...currBoard });
     updateHint({ ...currPhase });
     updateGameBoard({ phase: currPhase, board: currBoard });
-    updateButtons({ ...currPhase });
+    updateState({ ...currPlayer });
+    updateButtons({ ...currPhase, ...currBoard, ...currPlayer });
+    attackMode = fallbackAttackMode = null;
   }
 }
 
@@ -896,9 +894,7 @@ function captureAllClicks(event) {
     if (screenType.mode === "attack") {
       showConfirmModal({
         title: "发起攻击",
-        msg: `确认要用${screenType.type}攻击[${toReadablePos(
-          event.target.id
-        )}]吗？`,
+        msg: getAttackMessage({ type: screenType.type, id: event.target.id }),
         callback: () => {
           console.log(`对${event.target.id}${screenType.mode}成功`);
           setScreenMode({ mode: "reset" });
@@ -928,6 +924,15 @@ function captureAllClicks(event) {
   document.removeEventListener("click", captureAllClicks);
 }
 
+function getAttackMessage({ type, id }) {
+  let targetText = toReadablePos(id, attackMode ?? fallbackAttackMode);
+  if (type === "飞机") {
+    return `确认要消耗1架飞机攻击[${targetText}]吗？`;
+  } else {
+    return `确认要用${type}攻击[${targetText}]吗？`;
+  }
+}
+
 function onAttackButton(event, type) {
   event.stopPropagation();
   event.target.classList.add("active");
@@ -945,14 +950,6 @@ function onMoveButton() {}
 function onShopButton() {}
 function onSkillButton() {}
 
-function inactivateAllDropdownItems() {
-  $(".dropdown-item").each((idx, elem) => {
-    elem.classList.remove("active");
-  });
-}
-
-$("#attackDropdownList").on("hide.bs.dropdown", inactivateAllDropdownItems);
-
 function updateProgressBar(duration) {
   $("#gameProgressBar").stop();
   $("#gameProgressBar").attr("style", "width: 0%");
@@ -962,6 +959,15 @@ function updateProgressBar(duration) {
       { duration: duration * 1000, easing: "linear" }
     );
   }
+}
+
+function closeAllExcept(activeScreen, hasStatusBar) {
+  for (const screen of allScreens.filter((s) => s.id != activeScreen.id)) {
+    screen.style.display = "none";
+  }
+  screenWithStatusBar.style.display = hasStatusBar ? "block" : "none";
+  activeScreen.style.display = "block";
+  if (!hasStatusBar) hideTimer();
 }
 
 function displayInitialScreen() {
@@ -997,16 +1003,99 @@ function displayGameScreen() {
   gameBoard.style.marginTop = "0px";
 }
 
-function toReadablePos(id) {
+function toReadablePos(id, atkMode) {
   const pos = id.split("-");
   if (pos.length != 2) {
     return "未知坐标";
   }
-  return `${pos[0]}行${toLetter(parseInt(pos[1]))}列`;
+  if (atkMode === "row") return `${pos[0]}行`;
+  else if (atkMode === "col") return `${toLetter(parseInt(pos[1]))}列`;
+  else if (atkMode === "3by3")
+    return `${pos[0]}行${toLetter(parseInt(pos[1]))}列起的3*3范围`;
+  else return `${pos[0]}行${toLetter(parseInt(pos[1]))}列`;
+}
+
+// helper functions
+
+// take in multiple strings, suggest line break in between
+function suggestLineBreak(...strs) {
+  let res = "";
+  for (const str of strs) {
+    res += `<span class="d-inline-block">${str}</span>`;
+  }
+  return res;
+}
+
+function toTextInfo(str) {
+  return `<span class="text-info">${str}</span>`;
+}
+
+function highlight(...components) {
+  for (let component of components) component.classList.add("hi");
+}
+
+function unhighlight(...components) {
+  for (let component of components) component.classList.remove("hi");
+}
+
+function linebreak() {
+  return "<br/>";
 }
 
 function toLetter(num) {
   return String.fromCharCode("A".charCodeAt(0) + num - 1);
+}
+
+function enableAllButtonsExcept(...buttons) {
+  for (const b of allGameButtons) {
+    if (buttons && buttons.includes(b)) disable(b);
+    else enable(b);
+  }
+}
+
+function disableAllButtonsExcept(...buttons) {
+  for (const b of allGameButtons) {
+    if (buttons && buttons.includes(b)) enable(b);
+    else disable(b);
+  }
+}
+
+function enable(...buttons) {
+  for (const b of buttons) {
+    if (b.nodeName === "A") {
+      b.classList.remove("disabled");
+    } else {
+      b.disabled = false;
+    }
+  }
+}
+
+function disable(...buttons) {
+  for (const b of buttons) {
+    if (b.nodeName === "A") {
+      b.classList.add("disabled");
+    } else {
+      b.disabled = true;
+    }
+  }
+}
+
+function inactivateAllDropdownItems() {
+  $(".dropdown-item").each((idx, elem) => {
+    elem.classList.remove("active");
+  });
+}
+
+// window-related
+
+window.onload = function () {
+  displayInitialScreen();
+};
+
+if (!DEBUG) {
+  window.addEventListener("beforeunload", (event) => {
+    event.returnValue = "你确定要离开吗？";
+  });
 }
 
 // VH Resize functions
@@ -1044,16 +1133,16 @@ function refreshVH() {
 
 // display modal
 let infoTimerItvID;
-let reoepnCallback;
+let infoModalHiddenCallback;
 $("#infoModal").on("hidden.bs.modal", (e) => {
   if (e.currentTarget.id === "infoModal") {
     if (infoTimerItvID) {
       clearInterval(infoTimerItvID);
       infoTimerItvID = null;
     }
-    if (reoepnCallback) {
-      reoepnCallback();
-      reoepnCallback = null;
+    if (infoModalHiddenCallback) {
+      infoModalHiddenCallback();
+      infoModalHiddenCallback = null;
     }
   }
 });
@@ -1062,9 +1151,9 @@ $("#confirmModal").on("hidden.bs.modal", (e) => {
     if (screenType.mode && screenType.mode != "reset") {
       setScreenMode({ mode: "reset" });
     }
-    if (reoepnCallback) {
-      reoepnCallback();
-      reoepnCallback = null;
+    if (infoModalHiddenCallback) {
+      infoModalHiddenCallback();
+      infoModalHiddenCallback = null;
     }
   }
 });
@@ -1077,12 +1166,12 @@ $("#infoModal").on("shown.bs.modal", () => {
 });
 function showInfoModal({ title, msg, duration }) {
   if ($("#infoModal").is(":visible")) {
-    reoepnCallback = () => showInfoModal({ title, msg, duration });
+    infoModalHiddenCallback = () => showInfoModal({ title, msg, duration });
     $("#infoModal").modal("hide");
     return;
   }
   if ($("#confirmModal").is(":visible")) {
-    reoepnCallback = () => showInfoModal({ title, msg, duration });
+    infoModalHiddenCallback = () => showInfoModal({ title, msg, duration });
     $("#confirmModal").modal("hide");
     return;
   }
@@ -1108,7 +1197,26 @@ function showInfoModal({ title, msg, duration }) {
   $("#infoModal").modal("show");
 }
 
-function showConfirmModal({ title, msg, callback, showAtBottom }) {
+let confirmModalHiddenCallback;
+$("#confirmModal").on("hidden.bs.modal", (e) => {
+  if (e.currentTarget.id === "confirmModal") {
+    if (confirmModalHiddenCallback) {
+      confirmModalHiddenCallback();
+      confirmModalHiddenCallback = null;
+    }
+  }
+});
+
+function showConfirmModal({
+  title,
+  msg,
+  callback,
+  showAtBottom,
+  leftButtonText,
+  rightButtonText,
+  leftCallback,
+  triggerCallbackAfterHidden,
+}) {
   if (DEBUG && !showAtBottom) {
     callback();
     return;
@@ -1119,10 +1227,34 @@ function showConfirmModal({ title, msg, callback, showAtBottom }) {
     $("#confirmModalTitle").hide();
   }
   $("#confirmModalBody").html(msg);
+  if (leftButtonText) {
+    $("#confirmModalNoButton").html(leftButtonText);
+  } else {
+    $("#confirmModalNoButton").html("取消");
+  }
+  if (rightButtonText) {
+    $("#confirmModalYesButton").html(rightButtonText);
+  } else {
+    $("#confirmModalYesButton").html("确定");
+  }
   $("#confirmModalYesButton").unbind("click");
   $("#confirmModalYesButton").on("click", () => {
-    callback();
+    if (triggerCallbackAfterHidden) confirmModalHiddenCallback = callback;
+    else callback();
   });
+  if (leftCallback) {
+    $("#confirmModalNoButton").removeClass("btn-secondary");
+    $("#confirmModalNoButton").addClass("btn-primary");
+    $("#confirmModalNoButton").unbind("click");
+    $("#confirmModalNoButton").on("click", () => {
+      if (triggerCallbackAfterHidden) confirmModalHiddenCallback = leftCallback;
+      else leftCallback();
+    });
+  } else {
+    $("#confirmModalNoButton").unbind("click");
+    $("#confirmModalNoButton").removeClass("btn-primary");
+    $("#confirmModalNoButton").addClass("btn-secondary");
+  }
   if (showAtBottom) {
     $("#confirmModalDialog").addClass("modalDialogEnd");
     $(".modal-backdrop.show").css("opacity", "0.2");

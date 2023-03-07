@@ -571,7 +571,7 @@
             >
               <div
                 id="gameStateLeft"
-                class="d-flex flex-column justify-content-around align-items-center"
+                class="d-flex flex-column justifyContentEvenly align-items-center"
               >
                 <div class="shipTextMuted">
                   <span id="gamePlayerIndex"> </span><small>号位</small>
@@ -581,15 +581,14 @@
               </div>
               <div
                 id="gameStateMid"
-                class="d-flex flex-column justify-content-around"
+                class="d-flex flex-column justifyContentEvenly"
               >
                 <div id="gameHealth" class="lt"></div>
                 <div>节操：<span id="gameMoral" class="lt"></span></div>
-                <div id="gameStateMidDummy" class="invisible lt">占位</div>
               </div>
               <div
                 id="gameStateRight"
-                class="d-flex flex-column justify-content-around"
+                class="d-flex flex-column justifyContentEvenly"
               >
                 <div>
                   航速：<span id="gameSpeedCurr" class="lt"></span>/<span
@@ -606,10 +605,13 @@
                     id="gameTorpedoMax"
                   ></span>
                 </div>
-                <div id="gameAircraftLine">
-                  飞机：<span id="gameAircraftCurr" class="lt"></span>/<span
-                    id="gameAircraftMax"
-                  ></span>
+                <div id="gameAircraftAtkLine">
+                  飞机攻击：<span id="gameAircraftAtkCurr" class="lt"></span
+                  >/<span id="gameAircraftAtkMax"></span>
+                </div>
+                <div id="gameAircraftDetLine">
+                  飞机侦察：<span id="gameAircraftDetCurr" class="lt"></span
+                  >/<span id="gameAircraftDetMax"></span>
                 </div>
               </div>
             </div>
