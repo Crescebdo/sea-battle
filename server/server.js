@@ -12,6 +12,7 @@ const io = require("socket.io")(httpServer, {
   allowEIO3: true,
 });
 const {
+  log,
   validateShipDecision,
   makeRoomID,
   linkShip,
@@ -21,6 +22,9 @@ const {
   startInTurn,
   getPhase,
   getPlayer,
+  fetchGameAndPlayer,
+  fetchPhase,
+  verifyAttack,
 } = require("./game");
 const {
   MIN_PLAYER_NUM,
@@ -51,6 +55,7 @@ io.on("connection", (client) => {
   });
   client.on("decideShip", handleDecideShip);
   client.on("chosenGhost", handleChosenGhost);
+  client.on("makeAttack", handleMakeAttack);
 
   function handleNewWaitingRoom(nickname) {
     if (toPID(cid)) {
@@ -289,6 +294,31 @@ io.on("connection", (client) => {
         );
       }
     }
+  }
+
+  function handleMakeAttack({ phaseID, type, mode, target }) {
+    const p = validateConncetionInRoom();
+    if (!p) return;
+    let game, player, phase, err;
+    [game, player, err] = fetchGameAndPlayer(games, p);
+    if (err) {
+      client.emit("error", err, false);
+      return;
+    }
+    [phase, err] = fetchPhase(game, phaseID);
+    if (err) {
+      client.emit("error", err, false);
+      return;
+    }
+    err = verifyAttack({game, phase, player, type, mode, target});
+    if (err) {
+      client.emit("error", err, false);
+      return;
+    }
+    gameLog(
+      player.roomID,
+      `${player.pid}使用${type}对${JSON.stringify(target)}攻击成功`
+    );
   }
 
   async function waitAndFire(roomID) {

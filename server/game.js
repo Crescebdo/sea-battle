@@ -109,6 +109,7 @@ function linkShip(games, player, { shipNum, width, height, row, col }) {
     speedMax: SHIP_SETTING[shipNum].speed,
     health: SHIP_SETTING[shipNum].health,
     skills: SHIP_SETTING[shipNum].skills.map((s) => s.skillName),
+    attackHistory: [],
   };
   for (const p of game.players) {
     if (p.pid === player.pid) {
@@ -221,7 +222,7 @@ function updateWeather(game) {
     newWeather = weightedRandom(WEATHER, WEATHER_WEIGHT_NORMAL);
   }
   // debug
-  newWeather = WEATHER.filter((w) => w.name === "寒潮")[0];
+  newWeather = WEATHER.filter((w) => w.name === "雷雨")[0];
   game.board.weather = newWeather.name;
   addNotif({
     game,
@@ -354,6 +355,16 @@ function getPlayer(game, pid) {
   player.pid = undefined;
   player.actualItems = undefined;
   return player;
+}
+
+function getShip(game, player) {
+  if (
+    !player.shipID ||
+    !game.objects[player.shipID] ||
+    game.objects[player.shipID].typeName != "boat"
+  )
+    return;
+  return game.objects[player.shipID];
 }
 
 // [min, max]
@@ -502,6 +513,7 @@ function toLetter(num) {
 }
 
 function lastElem(arr) {
+  if (!arr) return null;
   return arr[arr.length - 1];
 }
 
@@ -526,9 +538,205 @@ function getMinMaxExclude(start, end, exclude) {
   return [min, max];
 }
 
+function getDiagDist(r1, c1, r2, c2) {
+  return Math.max(Math.abs(r1 - r2), Math.abs(c1 - c2));
+}
+
+function fetchGameAndPlayer(games, p) {
+  const game = games[p.roomID];
+  if (!game) return [null, null, "啊咧？当前房间号对应的游戏不存在……"];
+  const playerIndex = game.players.findIndex((e) => e.pid === p.pid);
+  if (playerIndex < 0) return [null, null, "啊咧？游戏中找不到当前玩家"];
+  return [game, game.players[playerIndex], null];
+}
+
+function fetchPhase(game, phaseID) {
+  if (!game.phases) return [null, "啊咧？当前游戏没有阶段"];
+  if (lastElem(game.phases).phaseID != phaseID)
+    return [null, "啊咧？无匹配阶段"];
+  const phase = lastElem(game.phases);
+  if (Date.now() > phase.startTime + phase.duration * 1000)
+    return [null, "操作超时"];
+  return [phase, null];
+}
+
+function fetchShip(game, player) {
+  if (!player.shipID) return [null, "啊咧？当前玩家没有船只"];
+  if (!game.objects[player.shipID]) return [null, "啊咧？找不到当前玩家的船只"];
+  if (game.objects[player.shipID].typeName != "boat")
+    return [null, "啊咧？当前玩家的船只类型异常"];
+  return [game.objects[player.shipID], null];
+}
+
+// attack logic
+
+function verifyAttack({ game, phase, player, type, mode, target }) {
+  if (player.dizzy) return "眩晕状态下不可攻击";
+  let err = verifyAttackInputParams({ type, mode, target });
+  if (err) return err;
+  err = verifyCurrentTurn({ phase, player });
+  if (err) return err;
+  let ship;
+  [ship, err] = fetchShip(game, player);
+  if (err) return err;
+  err = verifyAttackNum({ ship, type });
+  if (err) return err;
+  err = verifyAttackDist({ ship, type, mode, target });
+  if (err) return err;
+  let str; // 攻击目标字符串化
+  [str, err] = verifyAttackTarget({ game, ship, mode, target });
+  if (err) return err;
+
+  // 攻击生效
+  const atkDamage = getAttackDamage({ game });
+  const atkPositions = getAttackPositions({ mode, target });
+  ship.attackHistory.push({ mode, str });
+  proceedAttack({
+    game,
+    atkSource: ship,
+    atkPattern: "boat",
+    atkMethod: "normal",
+    atkItem: player.items,
+    atkDamage,
+    atkPositions,
+  }); // todo 攻击方式
+}
+
+function verifyAttackInputParams({ type, mode, target }) {
+  if (!["cannon", "torpedo", "aircraft"].includes(type))
+    return "未知的攻击方式";
+  if (!target) return "没有攻击坐标";
+  const { row, col } = { ...target };
+  if (mode === "row") {
+    if (isNaN(row)) return "攻击行数未知";
+    target = { row };
+  } else if (mode === "col") {
+    if (isNaN(col)) return "攻击列数未知";
+    target = { col };
+  } else {
+    if (isNaN(target.row) || isNaN(target.col)) return "攻击坐标无效";
+    target = { row, col };
+  }
+}
+
+function verifyCurrentTurn({ phase, player }) {
+  // log(phase);
+  // log(player);
+  if (
+    phase.type != "turn" ||
+    !phase.turnOwner ||
+    phase.turnOwner.pid != player.pid
+  )
+    return "不是当前玩家的回合";
+}
+
+function verifyAttackNum({ ship, type }) {
+  if (!ship.attack || !ship.attack[type]) return "剩余攻击次数不足";
+}
+
+function verifyAttackDist({ ship, type, mode, target }) {
+  let currDist;
+  if (mode === "row") {
+    currDist = Math.abs(ship.row - target.row);
+  } else if (mode === "col") {
+    currDist = Math.abs(ship.col - target.col);
+  } else {
+    currDist = getDiagDist(ship.row, ship.col, target.row, target.col);
+  }
+  if (!ship.attackDist || !ship.attackDist[type]) return "找不到攻击距离";
+  if (currDist > ship.attackDist[type]) return "超出攻击距离";
+}
+
+function verifyAttackTarget({ game, ship, mode, target }) {
+  const str = JSON.stringify(target);
+  const sameMode = ship.attackHistory.filter((h) => h.mode === mode);
+  const sameTarget = sameMode.filter((h) => h.str === str);
+  if (sameTarget.length > 0) return [null, "本回合已攻击过该坐标"];
+  if (
+    (target.row && game.board.noGo.rows.includes(target.row)) ||
+    (target.col && game.board.noGo.cols.includes(target.col))
+  )
+    return [null, "攻击坐标不应在禁区中"];
+  return [str, null];
+}
+
+function proceedAttack({
+  game,
+  atkSource,
+  atkPattern,
+  atkMethod,
+  atkItem,
+  atkDamage,
+  atkPositions,
+}) {
+  const atkList = getAttackedList({ game, atkPositions });
+  
+}
+
+function getAttackDamage({ game }) {
+  let res = 1;
+  if (game.board.weather === "满月") res++;
+  // todo 暴击
+  return res;
+}
+
+function getAttackPositions({ game, mode, target }) {
+  const { row, col } = target;
+  let res = [];
+  let [rowStart, rowEnd, colStart, colEnd] = [row, row, col, col];
+  if (mode === "row") [colStart, colEnd] = [1, 8];
+  else if (mode === "col") [rowStart, rowEnd] = [1, 8];
+  else if (mode === "3by3") [rowEnd, colEnd] = [row + 2, col + 2];
+  for (let r = rowStart; r <= rowEnd; r++)
+    for (let c = colStart; c <= colEnd; c++) {
+      if (r < 1 || r > 8 || c < 1 || c > 8) continue;
+      if (game.board.noGo.rows.includes(r) || game.board.noGo.cols.includes(c))
+        continue;
+      res.push([r, c]);
+    }
+  return res;
+}
+
+function getAttackedList({ game, atkPositions }) {
+  let res = [];
+  for (const obj of game.objects)
+    if (isHit(obj.row, obj.col, obj.width, obj.height, atkPositions))
+      res.push(obj);
+  const typeNameOrder = ["fish", "bomb", "boat"];
+  res.sort((a, b) => {
+    if (a.typeName != b.typeName)
+      return (
+        typeNameOrder.findIndex(a.typeName) -
+        typeNameOrder.findIndex(b.typeName)
+      );
+    if (a.typeName === "fish") {
+      if (a.row < b.row || (a.row === b.row && a.col < b.col)) return -1;
+      else return 1;
+    }
+    if (a.typeName === "boat") {
+      return (
+        game.playeres.findIndex((p) => p.pid === a.pid) -
+        game.playeres.findIndex((p) => p.pid === b.pid)
+      );
+    }
+    return -1;
+  });
+}
+
+function isHit(row, col, width, height, atkPositions) {
+  for (const p of atkPositions)
+    if (
+      row <= p.row &&
+      p.row < row + height &&
+      col <= p.col &&
+      p.col < col + width
+    )
+      return true;
+}
+
 /* eslint-disable */
-function log(obj) {
-  console.log(JSON.stringify(obj, null, 4));
+function log(...objList) {
+  for (const obj of objList) console.log(JSON.stringify(obj, null, 2));
 }
 /* eslint-enable */
 
@@ -542,4 +750,9 @@ module.exports = {
   startInTurn,
   getPhase,
   getPlayer,
+  getShip,
+  fetchGameAndPlayer,
+  fetchPhase,
+  verifyAttack,
+  log,
 };
